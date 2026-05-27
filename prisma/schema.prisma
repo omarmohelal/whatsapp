@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum HandoffStatus {
+  NONE
+  REQUESTED
+  ACTIVE
+  RESOLVED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+  ADMIN
+}
+
+enum MessageContentType {
+  TEXT
+  IMAGE
+  UNKNOWN
+}
+
+enum KnowledgeSource {
+  MANUAL
+  FAQ_SUGGESTION
+  CHAT_DRAFT
+}
+
+enum KnowledgeStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  ARCHIVED
+}
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  AGENT
+}
+
+enum HandoffEventType {
+  REQUESTED
+  ACTIVATED
+  RESOLVED
+  ADMIN_REPLY
+}
+
+enum FaqSuggestionStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MediaEventType {
+  INBOUND_MEDIA
+  OUTBOUND_IMAGE
+}
+
+model Business {
+  id                String             @id @default(uuid()) @db.Uuid
+  name              String
+  slug              String             @unique
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  whatsAppPhones    WhatsAppPhone[]
+  contacts          Contact[]
+  conversations     Conversation[]
+  knowledgeDocs     KnowledgeDocument[]
+  knowledgeChunks   KnowledgeChunk[]
+  mediaCatalogItems MediaCatalogItem[]
+  faqSuggestions    FaqSuggestion[]
+
+  @@map("businesses")
+}
+
+model WhatsAppPhone {
+  id                   String   @id @default(uuid()) @db.Uuid
+  businessId           String   @map("business_id") @db.Uuid
+  phoneNumberId        String   @unique @map("phone_number_id")
+  displayPhoneNumber   String?  @map("display_phone_number")
+  accessTokenSecretRef String?  @map("access_token_secret_ref")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  business             Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("whatsapp_phones")
+}
+
+model Contact {
+  id             String         @id @default(uuid()) @db.Uuid
+  businessId     String         @map("business_id") @db.Uuid
+  waId           String         @map("wa_id")
+  displayName    String?        @map("display_name")
+  profileName    String?        @map("profile_name")
+  isSensitive    Boolean        @default(false) @map("is_sensitive")
+  lastSeenAt     DateTime       @default(now()) @map("last_seen_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  business       Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversations  Conversation[]
+  messages       Message[]
+
+  @@unique([businessId, waId])
+  @@index([businessId])
+  @@map("contacts")
+}
+
+model Conversation {
+  id                String                     @id @default(uuid()) @db.Uuid
+  businessId        String                     @map("business_id") @db.Uuid
+  contactId         String                     @map("contact_id") @db.Uuid
+  status            ConversationStatus         @default(OPEN)
+  handoffStatus     HandoffStatus              @default(NONE) @map("handoff_status")
+  handoffReason     String?                    @map("handoff_reason")
+  needsHumanPricing Boolean                    @default(false) @map("needs_human_pricing")
+  needsHumanSales   Boolean                    @default(false) @map("needs_human_sales")
+  isSensitive       Boolean                    @default(false) @map("is_sensitive")
+  lastMessageAt     DateTime                   @default(now()) @map("last_message_at")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+  business          Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contact           Contact                    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages          Message[]
+  mediaEvents       MediaEvent[]
+  handoffEvents     HandoffEvent[]
+  credentialEvents  SensitiveCredentialEvent[]
+  faqSuggestions    FaqSuggestion[]
+
+  @@index([businessId, lastMessageAt])
+  @@index([contactId, status])
+  @@index([handoffStatus])
+  @@map("conversations")
+}
+
+model Message {
+  id                          String                     @id @default(uuid()) @db.Uuid
+  conversationId              String                     @map("conversation_id") @db.Uuid
+  contactId                   String?                    @map("contact_id") @db.Uuid
+  direction                   MessageDirection
+  channelMessageId            String?                    @unique @map("channel_message_id")
+  body                        String?
+  contentType                 MessageContentType         @default(TEXT) @map("content_type")
+  mediaId                     String?                    @map("media_id")
+  mediaUrl                    String?                    @map("media_url")
+  metadata                    Json?
+  containsSensitiveCredential Boolean                    @default(false) @map("contains_sensitive_credential")
+  createdAt                   DateTime                   @default(now()) @map("created_at")
+  conversation                Conversation               @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  contact                     Contact?                   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  mediaEvents                 MediaEvent[]
+  credentialEvents            SensitiveCredentialEvent[]
+
+  @@index([conversationId, createdAt])
+  @@index([contactId])
+  @@map("messages")
+}
+
+model MediaEvent {
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @map("conversation_id") @db.Uuid
+  messageId      String?        @map("message_id") @db.Uuid
+  type           MediaEventType
+  providerMediaId String?       @map("provider_media_id")
+  url            String?
+  metadata       Json?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message        Message?       @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("media_events")
+}
+
+model KnowledgeDocument {
+  id                String           @id @default(uuid()) @db.Uuid
+  businessId        String           @map("business_id") @db.Uuid
+  title             String
+  body              String
+  source            KnowledgeSource  @default(MANUAL)
+  status            KnowledgeStatus  @default(DRAFT)
+  internalNotes     String?          @map("internal_notes")
+  createdByAdminId  String?          @map("created_by_admin_id") @db.Uuid
+  approvedByAdminId String?          @map("approved_by_admin_id") @db.Uuid
+  approvedAt        DateTime?        @map("approved_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  business          Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  chunks            KnowledgeChunk[]
+  approvedByAdmin   AdminUser?       @relation("approved_knowledge", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+  createdByAdmin    AdminUser?       @relation("created_knowledge", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id         String                    @id @default(uuid()) @db.Uuid
+  businessId String                    @map("business_id") @db.Uuid
+  documentId String                    @map("document_id") @db.Uuid
+  content    String
+  embedding  Unsupported("vector(1536)")?
+  metadata   Json?
+  createdAt  DateTime                  @default(now()) @map("created_at")
+  business   Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  document   KnowledgeDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([documentId])
+  @@map("knowledge_chunks")
+}
+
+model MediaCatalogItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  key        String
+  title      String
+  imageUrl   String?  @map("image_url")
+  aliases    String[] @default([])
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, key])
+  @@index([businessId])
+  @@map("media_catalog_items")
+}
+
+model AdminUser {
+  id                String              @id @default(uuid()) @db.Uuid
+  email             String              @unique
+  name              String?
+  role              AdminRole           @default(AGENT)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  approvedKnowledge KnowledgeDocument[] @relation("approved_knowledge")
+  createdKnowledge  KnowledgeDocument[] @relation("created_knowledge")
+  handoffEvents     HandoffEvent[]
+
+  @@map("admin_users")
+}
+
+model HandoffEvent {
+  id             String           @id @default(uuid()) @db.Uuid
+  conversationId String           @map("conversation_id") @db.Uuid
+  adminUserId    String?          @map("admin_user_id") @db.Uuid
+  type           HandoffEventType
+  reason         String?
+  metadata       Json?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  adminUser      AdminUser?       @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("handoff_events")
+}
+
+model SensitiveCredentialEvent {
+  id               String       @id @default(uuid()) @db.Uuid
+  conversationId   String       @map("conversation_id") @db.Uuid
+  messageId        String?      @map("message_id") @db.Uuid
+  credentialType   String       @map("credential_type")
+  maskedPreview    String       @map("masked_preview")
+  encryptedPayload String?      @map("encrypted_payload")
+  deleteAfter      DateTime     @map("delete_after")
+  deletedAt        DateTime?    @map("deleted_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message          Message?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([deleteAfter, deletedAt])
+  @@map("sensitive_credential_events")
+}
+
+model FaqSuggestion {
+  id                 String              @id @default(uuid()) @db.Uuid
+  businessId         String              @map("business_id") @db.Uuid
+  conversationId     String?             @map("conversation_id") @db.Uuid
+  question           String
+  answer             String
+  evidenceMessageIds String[]            @default([]) @map("evidence_message_ids")
+  status             FaqSuggestionStatus @default(PENDING)
+  approvedDocumentId String?             @map("approved_document_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation       Conversation?       @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@map("faq_suggestions")
+}
