@@ -137,6 +137,7 @@ model Conversation {
   unreadCount       Int                        @default(0) @map("unread_count")
   lastIntent        String?                    @map("last_intent")
   detectedGame      String?                    @map("detected_game")
+  pendingFields     Json?                      @map("pending_fields")
   customerName      String?                    @map("customer_name")
   lastAskedQuestion String?                    @map("last_asked_question")
   lastInboundAt     DateTime?                  @map("last_inbound_at")

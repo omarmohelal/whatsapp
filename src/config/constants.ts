@@ -5,7 +5,7 @@ export const DEFAULT_BUSINESS = {
 
 export const GREETING_REPLIES = [
   'وعليكم السلام ورحمة الله ❤️ تحت أمرك، تحب تشحن إيه؟',
-  'أهلاً بيك يا فندم ❤️ ابعتلي اسم اللعبة أو الخدمة اللي محتاجها.',
+  'أهلاً بيك يا فندم ❤️ ابعتلي الخدمة اللي محتاجها.',
   'نورتنا ❤️ محتاج شحن، جيفت، ولا أكونت؟'
 ] as const;
 
@@ -31,7 +31,37 @@ export const PAYMENT_METHODS_REPLY = `طرق الدفع المتاحة ❤️
 لو معاك طريقة دفع تانية قولنا عليها وهنوفرهالك إن شاء الله.`;
 
 export const GENERAL_TOP_UP_REPLY =
-  'بنقدر نشحن أغلب الألعاب ❤️\nابعت اسم اللعبة + السيرفر/الريجون + الباقة اللي محتاجها.';
+  'تمام ❤️ ابعتلي اسم اللعبة والباقه اللي محتاجها.';
+
+export const UNKNOWN_GAME_TOP_UP_REPLY =
+  'تمام ❤️ بنشحن أغلب الألعاب.\nابعتلي اسم اللعبة كامل + الباقة المطلوبة، ولو محتاجة ريجون ابعته كمان.';
+
+export const WILD_RIFT_GAME_REPLY =
+  'تمام ❤️ Wild Rift.\nتحب تشحن أنهي باقة؟ ولو محتاج الأسعار أبعتهالك.';
+
+export const WILD_RIFT_TOP_UP_REPLY =
+  'تمام ❤️ ابعتلي الباقة اللي محتاجها في Wild Rift.';
+
+export const WILD_RIFT_PRICE_CAPTION =
+  'دي أسعار Wild Rift ❤️\nاختار الباقة اللي محتاجها وابعتها لنا.';
+
+export const LEAGUE_RP_TOP_UP_REPLY =
+  'تمام ❤️ ابعتلي السيرفر والباقه المطلوبة للـ RP.';
+
+export const LEAGUE_RP_PRICE_CAPTION =
+  'دي أسعار League RP ❤️\nالـ RP فوري. ابعت السيرفر والباقه المطلوبة.';
+
+export const VALORANT_TOP_UP_REPLY =
+  'تمام ❤️ ابعتلي الريجون والباقه المطلوبة للـ VP.';
+
+export const VALORANT_PRICE_CAPTION =
+  'دي أسعار Valorant VP ❤️\nابعت الريجون والباقه المطلوبة.';
+
+export const WILD_RIFT_PACKAGE_CONFIRMATION = (packageName: string) =>
+  `تمام ❤️ باقة ${packageName} لـ Wild Rift.\nتحب تدفع بإيه؟`;
+
+export const VODAFONE_PAYMENT_REPLY =
+  'تمام ❤️ فودافون كاش على الرقم:\n01007208978\nبعد التحويل ابعتلنا سكرين التحويل.';
 
 export const CREDENTIALS_REPLY =
   'تمام، لأمانك بلاش تبعت الباسورد هنا لو مش ضروري ❤️\nلو الطلب محتاج بيانات دخول، الأدمن هيكمل معاك أو ابعت البيانات من الفورم الآمن:\nhttps://www.thenexus.ink/';
