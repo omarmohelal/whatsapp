@@ -91,8 +91,9 @@ export class GeminiService implements AiClient {
         const model = client.getGenerativeModel({
           model: this.env.GEMINI_CHAT_MODEL,
           generationConfig: {
-            temperature: 0.25,
-            maxOutputTokens: 450
+            temperature: 0.55,
+            topP: 0.9,
+            maxOutputTokens: 520
           }
         });
         const result = await model.generateContent(messagesToGeminiText(messages));
