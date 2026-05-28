@@ -9,7 +9,25 @@ import { MediaCatalogService } from '../services/mediaCatalog';
 import { GeminiService } from '../services/gemini';
 import { deleteExpiredSensitiveCredentialData } from '../services/sensitiveDataTtl';
 import { WhatsAppCloudClient } from '../services/whatsapp';
+import { maskCustomerIdentifiers } from '../services/credentials';
 import { createQueues, createRedisConnection, scheduleRecurringJobs } from './queues';
+
+const WHATSAPP_JOB_TIMEOUT_MS = 60_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(`WhatsApp job timed out after ${ms}ms`)), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
 
 async function main() {
   const queues = createQueues(env);
@@ -32,8 +50,33 @@ async function main() {
   const incomingWorker = new Worker(
     'incoming-whatsapp-messages',
     async (job) => {
-      logger.info({ jobId: job.id, messageId: job.data.messageId }, 'Worker picked WhatsApp job');
-      await agent.handleIncomingMessage(job.data);
+      const text = (job.data.text ?? job.data.mediaCaption ?? '').trim();
+      logger.info(
+        {
+          jobId: job.id,
+          messageId: job.data.messageId,
+          from: maskCustomerIdentifiers(job.data.waId),
+          text: maskCustomerIdentifiers(text)
+        },
+        'Worker picked WhatsApp job'
+      );
+
+      try {
+        await withTimeout(agent.handleIncomingMessage(job.data), WHATSAPP_JOB_TIMEOUT_MS);
+        logger.info({ jobId: job.id, messageId: job.data.messageId }, 'Job completed successfully');
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        logger.error(
+          {
+            jobId: job.id,
+            messageId: job.data.messageId,
+            err: error,
+            reason
+          },
+          `Job failed with reason: ${reason}`
+        );
+        throw error;
+      }
     },
     {
       connection: createRedisConnection(env) as any,

@@ -92,5 +92,7 @@ export const UNSURE_REPLY =
 export const AI_FALLBACK_REPLY =
   'حصلت مشكلة مؤقتة في النظام، بس رسالتك وصلت ❤️ هخلي أدمن يتابع معاك بدل ما أديك معلومة غير مؤكدة.';
 
+export const GEMINI_MISSING_KEY_REPLY = 'تمام ❤️ وصلت رسالتك، أدمن هيكمل معاك حالًا.';
+
 export const UNRELATED_REPLY =
   'أقدر أساعدك في خدمات TheNexus بس: شحن ألعاب، RP، هدايا Riot، وبيع أو شراء أكونتات. تحب أساعدك في إيه منهم؟';

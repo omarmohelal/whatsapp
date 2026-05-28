@@ -4,5 +4,6 @@ module.exports = {
   testEnvironment: 'node',
   setupFiles: ['<rootDir>/tests/setupEnv.ts'],
   testMatch: ['<rootDir>/tests/**/*.test.ts'],
+  modulePathIgnorePatterns: ['<rootDir>/New folder'],
   clearMocks: true
 };

@@ -97,10 +97,13 @@ export class WhatsAppCloudClient implements WhatsAppClient {
         {
           status: response.status,
           code,
+          errorCode: data.error?.code,
+          errorMessage: data.error?.message,
           metaCode: data.error?.code,
           metaSubcode: data.error?.error_subcode,
           metaMessage: data.error?.message,
-          fbtraceId: data.error?.fbtrace_id
+          fbtraceId: data.error?.fbtrace_id,
+          responseBody: data
         },
         'WhatsApp send failed'
       );
@@ -113,7 +116,7 @@ export class WhatsAppCloudClient implements WhatsAppClient {
     }
 
     const messageId = data.messages?.[0]?.id;
-    logger.info({ messageType, messageId }, 'WhatsApp send success');
+    logger.info({ messageType, messageId, responseBody: data }, 'WhatsApp send success');
 
     return {
       messageId,

@@ -2,7 +2,9 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import type { Queue } from 'bullmq';
 import {
   AI_FALLBACK_REPLY,
+  CREDENTIALS_REPLY,
   DEFAULT_BUSINESS,
+  GEMINI_MISSING_KEY_REPLY,
   HUMAN_HANDOFF_REPLY,
   UNRELATED_REPLY,
   UNSURE_REPLY
@@ -52,6 +54,10 @@ export class AgentService {
   async handleIncomingMessage(input: IncomingWhatsAppJob): Promise<void> {
     const text = (input.text ?? input.mediaCaption ?? '').trim();
     const maskedText = maskCustomerIdentifiers(text);
+    this.deps.logger.info(
+      { messageId: input.messageId, from: maskCustomerIdentifiers(input.waId), text: maskedText },
+      'Agent started incoming message job'
+    );
     const business = await this.ensureBusiness(input.businessSlug ?? DEFAULT_BUSINESS.slug);
 
     if (input.phoneNumberId) {
@@ -119,23 +125,65 @@ export class AgentService {
       where: { id: conversation.id }
     });
 
+    const mediaCatalog = await this.deps.mediaCatalog.listActive(business.id);
+    const quickReply = detectQuickReply(text, mediaCatalog);
+    this.deps.logger.info(
+      {
+        messageId: input.messageId,
+        conversationId: conversation.id,
+        matched: Boolean(quickReply),
+        intent: quickReply?.intent,
+        kind: quickReply?.kind,
+        detectedGame: quickReply?.detectedGame,
+        needsHuman: quickReply?.needsHuman,
+        sensitive: quickReply?.sensitive
+      },
+      'Quick reply detection result'
+    );
+
+    if (quickReply) {
+      this.deps.logger.info(
+        {
+          messageId: input.messageId,
+          conversationId: conversation.id,
+          intent: quickReply.intent,
+          detectedGame: quickReply.detectedGame,
+          source: 'quick_reply'
+        },
+        'Selected intent'
+      );
+      await this.handleQuickReply(ctx, inboundMessage.id, quickReply, text);
+      return;
+    }
+
     if (
       latestConversation.handoffStatus === 'ACTIVE' ||
       latestConversation.handoffStatus === 'REQUESTED' ||
       !latestConversation.aiEnabled
     ) {
-      return;
-    }
-
-    const mediaCatalog = await this.deps.mediaCatalog.listActive(business.id);
-    const quickReply = detectQuickReply(text, mediaCatalog);
-
-    if (quickReply) {
-      await this.handleQuickReply(ctx, inboundMessage.id, quickReply, text);
+      this.deps.logger.info(
+        {
+          messageId: input.messageId,
+          conversationId: conversation.id,
+          handoffStatus: latestConversation.handoffStatus,
+          aiEnabled: latestConversation.aiEnabled
+        },
+        'Skipping AI response because conversation is in handoff or AI is disabled'
+      );
       return;
     }
 
     const intent = classifyIntent(text);
+    this.deps.logger.info(
+      {
+        messageId: input.messageId,
+        conversationId: conversation.id,
+        intent: intent.name,
+        confidence: intent.confidence,
+        game: intent.entities.game
+      },
+      'Selected intent'
+    );
     await this.updateConversationMemory(ctx.conversationId, {
       lastIntent: intent.name,
       detectedGame: intent.entities.game
@@ -281,6 +329,16 @@ export class AgentService {
     quickReply: QuickReplyResult,
     originalText: string
   ) {
+    this.deps.logger.info(
+      {
+        conversationId: ctx.conversationId,
+        intent: quickReply.intent,
+        kind: quickReply.kind,
+        detectedGame: quickReply.detectedGame
+      },
+      'Quick reply matched'
+    );
+
     await this.updateConversationMemory(ctx.conversationId, {
       lastIntent: quickReply.intent,
       detectedGame: quickReply.detectedGame,
@@ -367,15 +425,26 @@ export class AgentService {
 
     await this.sendAndStoreText(
       ctx,
-      'تمام، لأمانك بلاش تبعت الباسورد هنا لو مش ضروري ❤️\nلو الطلب محتاج بيانات دخول، الأدمن هيكمل معاك أو ابعت البيانات من الفورم الآمن:\nhttps://www.thenexus.ink/',
+      CREDENTIALS_REPLY,
       { intent: 'credentials' }
     );
   }
 
   private async handleRagAnswer(ctx: ConversationContext, text: string) {
+    if (!(process.env.GEMINI_API_KEY || this.deps.env.GEMINI_API_KEY)) {
+      this.deps.logger.warn(
+        { conversationId: ctx.conversationId },
+        'GEMINI_API_KEY missing; sending admin-continuation fallback'
+      );
+      await this.requestHandoff(ctx, 'gemini_missing_key');
+      await this.sendAndStoreText(ctx, GEMINI_MISSING_KEY_REPLY, { intent: 'gemini_missing_key' });
+      return;
+    }
+
     let context: KnowledgeSearchResult[] = [];
 
     try {
+      this.deps.logger.info({ conversationId: ctx.conversationId }, 'Before calling Gemini embedding search');
       context = await this.deps.knowledge.search({
         businessId: ctx.businessId,
         query: text,
@@ -393,6 +462,10 @@ export class AgentService {
     }
 
     const recentMessages = await this.getRecentMessages(ctx.conversationId);
+    this.deps.logger.info(
+      { conversationId: ctx.conversationId, contextCount: context.length },
+      'Before calling Gemini chat'
+    );
     const response = await this.deps.ai.createChatCompletion([
       { role: 'system', content: SYSTEM_PROMPT },
       ...recentMessages,
@@ -404,6 +477,10 @@ export class AgentService {
       }
     ]);
 
+    this.deps.logger.info(
+      { conversationId: ctx.conversationId, hasResponse: Boolean(response), responseLength: response.length },
+      'Gemini returned'
+    );
     this.deps.logger.info({ conversationId: ctx.conversationId }, 'Reply generated');
 
     if (!response || response === AI_FALLBACK_REPLY) {
@@ -483,6 +560,10 @@ export class AgentService {
     let sendFailed: Prisma.InputJsonValue | null = null;
 
     try {
+      this.deps.logger.info(
+        { conversationId: ctx.conversationId, to: maskCustomerIdentifiers(ctx.waId), intent: options.intent },
+        'Before sending WhatsApp text message'
+      );
       const result = await this.deps.whatsapp.sendText(ctx.waId, body);
       providerMessageId = result.messageId;
     } catch (error) {
@@ -519,6 +600,15 @@ export class AgentService {
     let sendFailed: Prisma.InputJsonValue | null = null;
 
     try {
+      this.deps.logger.info(
+        {
+          conversationId: ctx.conversationId,
+          to: maskCustomerIdentifiers(ctx.waId),
+          intent: options.intent,
+          imageUrl
+        },
+        'Before sending WhatsApp image message'
+      );
       const result = await this.deps.whatsapp.sendImage(ctx.waId, imageUrl, caption);
       providerMessageId = result.messageId;
     } catch (error) {

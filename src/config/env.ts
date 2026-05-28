@@ -24,7 +24,7 @@ const envSchema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).default(isTest ? 'phone-id' : ''),
   WHATSAPP_API_VERSION: z.string().default('v21.0'),
   META_APP_SECRET: z.string().optional().default(''),
-  GEMINI_API_KEY: z.string().min(1).default(isTest ? 'test-gemini-key' : ''),
+  GEMINI_API_KEY: z.string().optional().default(isTest ? 'test-gemini-key' : ''),
   GEMINI_CHAT_MODEL: z.string().default('gemini-1.5-flash'),
   GEMINI_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
   ENCRYPTION_KEY: z.string().min(16).default(isTest ? 'test-encryption-key-that-is-long-enough' : ''),

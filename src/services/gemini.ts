@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Env } from '../config/env';
-import { AI_FALLBACK_REPLY } from '../config/constants';
+import { AI_FALLBACK_REPLY, GEMINI_MISSING_KEY_REPLY } from '../config/constants';
 import type { AppLogger } from '../logger';
 
 export interface ChatMessage {
@@ -41,13 +41,15 @@ async function sleep(ms: number) {
 }
 
 export class GeminiService implements AiClient {
-  private readonly client: GoogleGenerativeAI;
+  private readonly client?: GoogleGenerativeAI;
 
   constructor(
     private readonly env: Env,
     private readonly logger?: Pick<AppLogger, 'warn' | 'error' | 'info'>
   ) {
-    this.client = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+    if (process.env.GEMINI_API_KEY || env.GEMINI_API_KEY) {
+      this.client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || env.GEMINI_API_KEY);
+    }
   }
 
   async generateGeminiReply(input: GeminiReplyInput): Promise<string> {
@@ -64,17 +66,29 @@ export class GeminiService implements AiClient {
   }
 
   async createEmbedding(input: string): Promise<number[]> {
+    const client = this.client;
+    if (!client) {
+      this.logger?.warn('GEMINI_API_KEY is missing; skipping Gemini embedding');
+      return [];
+    }
+
     return this.withRetry('gemini_embedding', async () => {
-      const model = this.client.getGenerativeModel({ model: this.env.GEMINI_EMBEDDING_MODEL });
+      const model = client.getGenerativeModel({ model: this.env.GEMINI_EMBEDDING_MODEL });
       const result = await model.embedContent(input);
       return normalizeEmbedding(result.embedding.values ?? []);
     });
   }
 
   async createChatCompletion(messages: ChatMessage[]): Promise<string> {
+    const client = this.client;
+    if (!client) {
+      this.logger?.warn('GEMINI_API_KEY is missing; returning safe Gemini fallback');
+      return GEMINI_MISSING_KEY_REPLY;
+    }
+
     try {
       return await this.withRetry('gemini_chat', async () => {
-        const model = this.client.getGenerativeModel({
+        const model = client.getGenerativeModel({
           model: this.env.GEMINI_CHAT_MODEL,
           generationConfig: {
             temperature: 0.25,

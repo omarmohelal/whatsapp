@@ -11,6 +11,7 @@ import type { AppQueues } from './jobs/queues';
 import { logger as defaultLogger, type AppLogger } from './logger';
 import { adminAuth } from './middleware/adminAuth';
 import { createAdminRouter } from './routes/admin';
+import { createDebugRouter } from './routes/debug';
 import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
 import type { AgentService } from './services/agent';
 import type { KnowledgeService } from './services/knowledge';
@@ -83,6 +84,18 @@ export function createApp(deps: AppDeps = {}) {
       incomingQueue: deps.queues?.incomingMessages,
       agent: deps.agent
     })
+  );
+
+  app.use(
+    '/debug',
+    rateLimit({
+      windowMs: 60_000,
+      limit: 30,
+      standardHeaders: true,
+      legacyHeaders: false
+    }),
+    adminAuth(appEnv.ADMIN_API_KEY),
+    createDebugRouter({ env: appEnv, logger: appLogger })
   );
 
   if (deps.admin) {
