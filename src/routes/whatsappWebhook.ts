@@ -61,9 +61,17 @@ export function extractIncomingMessages(payload: WhatsAppWebhookPayload): Incomi
 
       for (const message of value?.messages ?? []) {
         const type =
-          message.type === 'text' ? 'text' : message.type === 'image' ? 'image' : 'unknown';
+          message.type === 'text'
+            ? 'text'
+            : message.type === 'image'
+              ? 'image'
+              : message.type === 'sticker'
+                ? 'sticker'
+                : 'unknown';
+        const isGroup = message.from.includes('@g.us');
 
         jobs.push({
+          channel: 'whatsapp',
           phoneNumberId,
           displayPhoneNumber,
           waId: message.from,
@@ -73,6 +81,11 @@ export function extractIncomingMessages(payload: WhatsAppWebhookPayload): Incomi
           type,
           mediaId: message.image?.id,
           mediaCaption: message.image?.caption,
+          isGroup,
+          groupId: isGroup ? message.from : undefined,
+          mentionsBot:
+            typeof message.text?.body === 'string' &&
+            /@?(thenexus|the nexus|النكسس|ذا نكسس|نكسس)/iu.test(message.text.body),
           raw: message
         });
       }

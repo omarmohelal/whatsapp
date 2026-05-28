@@ -40,6 +40,7 @@ export interface WhatsAppIncomingMessage {
 }
 
 export interface IncomingWhatsAppJob {
+  channel?: 'whatsapp' | 'messenger';
   businessSlug?: string;
   phoneNumberId?: string;
   displayPhoneNumber?: string;
@@ -47,8 +48,12 @@ export interface IncomingWhatsAppJob {
   profileName?: string;
   messageId: string;
   text?: string;
-  type: 'text' | 'image' | 'unknown';
+  type: 'text' | 'image' | 'sticker' | 'unknown';
   mediaId?: string;
   mediaCaption?: string;
+  mediaUrl?: string;
+  isGroup?: boolean;
+  groupId?: string;
+  mentionsBot?: boolean;
   raw: WhatsAppIncomingMessage;
 }

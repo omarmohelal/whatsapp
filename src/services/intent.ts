@@ -33,7 +33,7 @@ export function normalizeForIntent(text: string): string {
     .replace(/ى/g, 'ي')
     .replace(/ة/g, 'ه')
     .replace(/[ًٌٍَُِّْـ]/g, '')
-    .replace(/[()\[\]{}'"`~!@#$%^&*_+=|\\/:;<>?,.،؟-]/g, ' ')
+    .replace(/[()[\]{}'"`~!@#$%^&*_+=|\\/:;<>?,.،؟-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

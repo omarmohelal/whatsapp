@@ -73,7 +73,13 @@ export function extractIncomingMessengerMessages(payload: MessengerPayload): Inc
 
       const text = item.message?.text ?? item.postback?.title ?? item.postback?.payload;
       const firstAttachment = item.message?.attachments?.[0];
-      const type = text ? 'text' : firstAttachment?.type === 'image' ? 'image' : 'unknown';
+      const type = text
+        ? 'text'
+        : firstAttachment?.type === 'image'
+          ? 'image'
+          : firstAttachment?.type === 'sticker'
+            ? 'sticker'
+            : 'unknown';
       const messageId = item.message?.mid ?? item.postback?.mid ?? `messenger-${senderId}-${item.timestamp ?? Date.now()}`;
 
       const raw: WhatsAppIncomingMessage = {
@@ -86,6 +92,7 @@ export function extractIncomingMessengerMessages(payload: MessengerPayload): Inc
       };
 
       jobs.push({
+        channel: 'messenger',
         phoneNumberId: `messenger:${entry.id ?? item.recipient?.id ?? 'page'}`,
         displayPhoneNumber: 'Messenger',
         waId: `messenger:${senderId}`,
@@ -94,6 +101,8 @@ export function extractIncomingMessengerMessages(payload: MessengerPayload): Inc
         text,
         type,
         mediaId: firstAttachment?.payload?.url,
+        mediaUrl: firstAttachment?.payload?.url,
+        isGroup: false,
         raw
       });
     }

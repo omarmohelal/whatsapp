@@ -1,13 +1,8 @@
 import {
   ACCOUNT_LISTING_REPLY,
-  COMING_SOON_REPLY,
   LEAGUE_SKIN_GIFT_REPLY,
-  PAYMENT_METHODS_REPLIES,
-  RIOT_GIFT_REPLY,
-  WILD_RIFT_HAVE_LOGIN_REPLY,
-  WILD_RIFT_FORGOT_PASSWORD_REPLY,
-  WILD_RIFT_FIND_EMAIL_REPLY,
-  WILD_RIFT_FORGOT_USERNAME_REPLY
+  PAYMENT_METHODS_REPLY,
+  PAYMENT_PROOF_REPLY
 } from '../src/config/constants';
 import { env } from '../src/config/env';
 import { loadDefaultMediaCatalog } from '../src/services/mediaCatalog';
@@ -15,217 +10,194 @@ import { detectQuickReply } from '../src/services/quickReplies';
 
 const catalog = loadDefaultMediaCatalog(env);
 
-describe('enhanced hybrid deterministic WhatsApp routing', () => {
-  it('answers payment methods with natural variety', () => {
-    const reply = detectQuickReply('طرق الدفع', catalog);
+describe('smart deterministic routing before Gemini', () => {
+  it('answers greetings briefly without a long menu', () => {
+    const reply = detectQuickReply('السلام عليكم', catalog);
 
-    expect(reply.matched).toBe(true);
-    expect(reply.responseType).toBe('text');
-    expect(reply.intent).toBe('payment_methods');
-    expect(PAYMENT_METHODS_REPLIES).toContain(reply.text);
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'greeting'
+    });
+    expect(reply.text).toContain('The Nexus');
   });
 
-  it('asks for Wild Rift package when only the game is mentioned', () => {
+  it('answers payment methods deterministically', () => {
+    const reply = detectQuickReply('الدفع ازاي؟', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'payment_methods',
+      text: PAYMENT_METHODS_REPLY
+    });
+  });
+
+  it('asks Wild Rift customers what service they need instead of sending prices', () => {
     const reply = detectQuickReply('وايلد ريفت', catalog);
 
     expect(reply).toMatchObject({
       matched: true,
       responseType: 'text',
-      game: 'wild_rift',
-      lastAskedQuestion: 'package'
+      intent: 'wild_rift_intake',
+      game: 'wild_rift'
     });
-    expect(reply.text).not.toContain('ريجون');
+    expect(reply.text).toContain('Cores');
+    expect(reply.imageUrl).toBeUndefined();
   });
 
-  it('sends the Wild Rift price image when the customer wants to top up', () => {
+  it('does not send a Wild Rift price image for a generic top-up request', () => {
     const reply = detectQuickReply('عايز اشحن وايلد ريفت', catalog);
+
+    expect(reply.responseType).toBe('text');
+    expect(reply.imageUrl).toBeUndefined();
+  });
+
+  it('sends Wild Rift price image only for explicit price list requests', () => {
+    const reply = detectQuickReply('اسعار وايلد ريفت', catalog);
 
     expect(reply).toMatchObject({
       matched: true,
       responseType: 'image',
-      game: 'wild_rift'
+      game: 'wild_rift',
+      priceRequest: true
     });
     expect(reply.imageUrl).toContain('wrc.png');
   });
 
-  it('routes Wild Rift cores requests to the account flow', () => {
-    const reply = detectQuickReply('عايز اشحن 500 كورز وايلد ريفت', catalog);
-
-    expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'text',
-      game: 'wild_rift',
-      intent: 'wr_cores_account',
-      lastAskedQuestion: 'wr_account_identify'
-    });
-    expect(reply.text).toContain('thenexus.ink');
-  });
-
-  it('guides the customer through Riot username recovery', () => {
-    const reply = detectQuickReply('مش عارف اليوزر', catalog, {
-      detectedGame: 'wild_rift',
-      lastIntent: 'wr_cores_account',
-      lastAskedQuestion: 'wr_account_identify',
-      pendingFields: { game: 'wild_rift', flow: 'wr_account' }
-    });
-
-    expect(reply.intent).toBe('wr_cores_recovery_username');
-    expect(reply.text).toBe(WILD_RIFT_FORGOT_USERNAME_REPLY);
-  });
-
-  it('guides the customer through Riot password recovery', () => {
-    const reply = detectQuickReply('نسيت الباسورد', catalog, {
-      detectedGame: 'wild_rift',
-      lastIntent: 'wr_cores_account',
-      lastAskedQuestion: 'wr_account_identify',
-      pendingFields: { game: 'wild_rift', flow: 'wr_account' }
-    });
-
-    expect(reply.intent).toBe('wr_cores_recovery_password');
-    expect(reply.text).toBe(WILD_RIFT_FORGOT_PASSWORD_REPLY);
-  });
-
-  it('guides the customer to find the linked email', () => {
-    const reply = detectQuickReply('مش عارف الايميل', catalog, {
-      detectedGame: 'wild_rift',
-      lastIntent: 'wr_cores_account',
-      lastAskedQuestion: 'wr_account_identify',
-      pendingFields: { game: 'wild_rift', flow: 'wr_account' }
-    });
-
-    expect(reply.intent).toBe('wr_cores_find_email');
-    expect(reply.text).toBe(WILD_RIFT_FIND_EMAIL_REPLY);
-  });
-
-  it('routes customers with login info to the secure form', () => {
-    const reply = detectQuickReply('عندي اليوزر والباس', catalog, {
-      detectedGame: 'wild_rift',
-      lastIntent: 'wr_cores_account',
-      lastAskedQuestion: 'wr_account_identify',
-      pendingFields: { game: 'wild_rift', flow: 'wr_account' }
-    });
-
-    expect(reply.intent).toBe('wr_cores_have_login');
-    expect(reply.text).toBe(WILD_RIFT_HAVE_LOGIN_REPLY);
-  });
-
-  it('helps customers choose League mode', () => {
-    const reply = detectQuickReply('عايز اشحن ليج', catalog);
-
-    expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'text',
-      game: 'league',
-      intent: 'league_menu',
-      lastAskedQuestion: 'league_mode'
-    });
-  });
-
-  it('answers League skin/gift flow', () => {
-    const reply = detectQuickReply('عايز سكن في ليج', catalog);
-
-    expect(reply.intent).toBe('league_skin_gift');
-    expect(reply.text).toBe(LEAGUE_SKIN_GIFT_REPLY);
-  });
-
-  it('sends the League RP image when the customer asks for RP', () => {
-    const reply = detectQuickReply('عايز RP', catalog);
-
-    expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'image',
-      game: 'league',
-      intent: 'league_rp'
-    });
-    expect(reply.imageUrl).toContain('lolrp213.png');
-  });
-
-  it('sends the Valorant price image when the customer wants to top up', () => {
-    const reply = detectQuickReply('عايز اشحن فالورنت', catalog);
-
-    expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'image',
-      game: 'valorant'
-    });
-    expect(reply.imageUrl).toContain('valvp.png');
-  });
-
-  it('handles misspelled Wild Rift aliases', () => {
-    const reply = detectQuickReply('وايلدرفت', catalog);
-
-    expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'text',
-      game: 'wild_rift'
-    });
-  });
-
-  it('handles misspelled cores aliases', () => {
-    const reply = detectQuickReply('عايز اشحن 10 الاف cors وايلد ريفت', catalog);
-
-    expect(reply.intent).toBe('wr_cores_account');
-  });
-
-  it('marks pasted credentials as sensitive and hands off', () => {
-    const reply = detectQuickReply('riot account email: x@gmail.com password: secret', catalog);
-
-    expect(reply.sensitive).toBe(true);
-    expect(reply.needsHuman).toBe(true);
-    expect(reply.handoffReason).toBe('sensitive_credentials');
-  });
-
-  it('returns the coming-soon reply for unsupported games', () => {
-    const reply = detectQuickReply('عايز اشحن ببجي', catalog);
-
-    expect(reply.intent).toBe('coming_soon');
-    expect(reply.text).toBe(COMING_SOON_REPLY);
-  });
-
-  it('answers account selling with the form instructions', () => {
-    const reply = detectQuickReply('عايز ابيع اكونت', catalog);
-
-    expect(reply.text).toBe(ACCOUNT_LISTING_REPLY);
-  });
-
-  it('answers general Riot gifts', () => {
-    const reply = detectQuickReply('جيفت', catalog);
-
-    expect(reply.text).toBe(RIOT_GIFT_REPLY);
-  });
-
-  it('explains first email for account sellers', () => {
-    const reply = detectQuickReply('يعني ايه فيرست', catalog, { lastIntent: 'account_sell' });
-
-    expect(reply.intent).toBe('first_email_explain');
-    expect(reply.text).toContain('Welcome to Riot Games');
-  });
-
-  it('answers a specific Wild Rift cores price without sending the full image', () => {
-    const reply = detectQuickReply('10000 كورز بكام وايلد ريفت', catalog);
+  it('calculates a known Wild Rift core package price', () => {
+    const reply = detectQuickReply('عايز اشحن 1000 كور', catalog, { detectedGame: 'wild_rift' });
 
     expect(reply).toMatchObject({
       matched: true,
       responseType: 'text',
       intent: 'specific_price',
-      game: 'wild_rift',
+      game: 'wild_rift'
+    });
+    expect(reply.text).toContain('575 EGP');
+    expect(reply.text).toContain('Instapay');
+  });
+
+  it('does not invent an unknown Wild Rift core price', () => {
+    const reply = detectQuickReply('500 كور بكام', catalog, { detectedGame: 'wild_rift' });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'unknown_price',
+      needsHuman: true
+    });
+    expect(reply.text).toContain('مش لاقي');
+  });
+
+  it('asks League RP customers for server and package without sending an image', () => {
+    const reply = detectQuickReply('عايز RP', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'league_intake',
+      game: 'league'
+    });
+  });
+
+  it('sends League RP image only for explicit price requests', () => {
+    const reply = detectQuickReply('اسعار ليج', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'image',
+      game: 'league',
       priceRequest: true
     });
-    expect(reply.text).toContain('4935 EGP');
   });
 
-  it('routes payment proof to admin review', () => {
-    const reply = detectQuickReply('حولت وبعت الفلوس', catalog);
+  it('asks Valorant customers for region and package without sending an image', () => {
+    const reply = detectQuickReply('عايز اشحن فالورانت', catalog);
 
-    expect(reply.intent).toBe('payment_proof');
-    expect(reply.needsHuman).toBe(true);
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'valorant_intake',
+      game: 'valorant'
+    });
   });
 
-  it('routes delivery delay complaints to admin review', () => {
+  it('asks League gift fields without sending TheNexus accounts', () => {
+    const reply = detectQuickReply('عايز skin gift في league', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'league_skin_gift',
+      text: LEAGUE_SKIN_GIFT_REPLY
+    });
+    expect(reply.text).not.toContain('TheNexus#0001');
+  });
+
+  it('sends Wild Rift gift accounts once when customer needs to add', () => {
+    const first = detectQuickReply('مش مضاف عندكم wild rift gift', catalog);
+    const second = detectQuickReply('مش مضاف عندكم wild rift gift', catalog, {
+      detectedGame: 'wild_rift',
+      pendingFields: { riotGiftAccountsSent: true }
+    });
+
+    expect(first.text).toContain('TheNexus#0001');
+    expect(second.text).not.toContain('TheNexus#0001');
+  });
+
+  it('asks mythic/orange essence details before pricing', () => {
+    const reply = detectQuickReply('mythic skin', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'mythic_orange_keys'
+    });
+    expect(reply.text).toContain('Orange Essence');
+  });
+
+  it('handles payment proof without asking to pay again', () => {
+    const reply = detectQuickReply('تم التحويل', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'payment_proof',
+      text: PAYMENT_PROOF_REPLY,
+      needsHuman: true
+    });
+  });
+
+  it('uses existing order context for payment proof', () => {
+    const reply = detectQuickReply('بعتلك', catalog, {
+      pendingFields: { game: 'wild_rift', package: '1000 WC' }
+    });
+
+    expect(reply.text).toContain('الطلب جاهز للمراجعة');
+  });
+
+  it('answers account selling with the improved form instructions', () => {
+    const reply = detectQuickReply('عايز ابيع اكونت', catalog);
+
+    expect(reply.text).toBe(ACCOUNT_LISTING_REPLY);
+    expect(reply.text).toContain('املى الفورم');
+  });
+
+  it('routes delivery delay to handoff', () => {
     const reply = detectQuickReply('الشحن اتأخر ولسه موصلش', catalog);
 
-    expect(reply.intent).toBe('delivery_delay');
-    expect(reply.needsHuman).toBe(true);
+    expect(reply).toMatchObject({
+      intent: 'delivery_delay',
+      needsHuman: true,
+      handoffReason: 'delivery_delay'
+    });
   });
 
+  it('lets Gemini handle generic top-up text without a supported game', () => {
+    const reply = detectQuickReply('عايز اشحن', catalog);
+
+    expect(reply).toMatchObject({
+      matched: false,
+      responseType: 'ai',
+      intent: 'top_up'
+    });
+  });
 });
