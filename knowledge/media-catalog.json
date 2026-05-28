@@ -3,9 +3,9 @@
     "key": "wild_rift_shipping",
     "game": "Wild Rift",
     "title": "Wild Rift top-up",
-    "caption": "دي أسعار Wild Rift ❤️\nابعتلنا الباقة اللي محتاجها والريجون.",
+    "caption": "دي أسعار Wild Rift ❤️\nاختار الباقة اللي محتاجها وبعدها هنكمل بيانات الأكونت للشحن.",
     "imageUrl": "https://zkxhnhckrwimheszycqr.supabase.co/storage/v1/object/public/whatsapp/wrc.png",
-    "aliases": ["wild rift", "وايلد", "وايلد ريفت", "wr"],
+    "aliases": ["wild rift", "وايلد", "وايلد ريفت", "وايلدرفت", "وايلد ريف", "wr"],
     "isActive": true
   },
   {
@@ -14,23 +14,23 @@
     "title": "League of Legends RP",
     "caption": "دي أسعار League RP ❤️\nالـ RP فوري. ابعتلنا السيرفر والباقه المطلوبة.",
     "imageUrl": "https://zkxhnhckrwimheszycqr.supabase.co/storage/v1/object/public/whatsapp/lolrp213.png",
-    "aliases": ["league", "lol", "ليج", "ليج اوف ليجندز", "rp", "ار بي"],
+    "aliases": ["league", "lol", "ليج", "ليج اوف ليجندز", "league of legends", "rp", "ار بي"],
     "isActive": true
   },
   {
     "key": "valorant_vp",
     "game": "Valorant",
     "title": "Valorant VP",
-    "caption": "دي أسعار Valorant VP ❤️\nابعتلنا الريجون والباقه المطلوبة.",
+    "caption": "دي أسعار Valorant VP ❤️\nالاستلام فوري. ابعتلنا الريجون والباقه المطلوبة.",
     "imageUrl": "https://zkxhnhckrwimheszycqr.supabase.co/storage/v1/object/public/whatsapp/valvp.png",
-    "aliases": ["valorant", "val", "فالورانت", "فال", "vp"],
+    "aliases": ["valorant", "val", "فالورانت", "فالورنت", "فال", "vp"],
     "isActive": true
   },
   {
     "key": "general_games",
     "game": "General Games",
     "title": "General game top-up",
-    "caption": "بنقدر نشحن أغلب الألعاب ❤️\nابعت اسم اللعبة + السيرفر/الريجون + الباقة اللي محتاجها.",
+    "caption": "الألعاب المتاحة حاليًا: Wild Rift / League / Valorant ❤️ وباقي الألعاب قريبًا.",
     "imageUrl": null,
     "aliases": ["شحن", "اشحن", "top up", "charge", "shipping"],
     "isActive": true

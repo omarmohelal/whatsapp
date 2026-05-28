@@ -29,24 +29,6 @@ npm run worker:dev
 npm run dashboard:dev
 ```
 
-
-## Smart Agent Behavior
-
-The bot now uses a hybrid flow instead of fixed autoresponses:
-
-1. Detects intent, game, price-list requests, payment method, credentials, and handoff requests.
-2. Uses conversation memory (`detected_game`, `last_asked_question`, and `pending_fields`) so follow-up messages like `٥ دولار`, `ابعت الباقة`, or `فودافون` are understood in context.
-3. Sends catalog images only when the customer clearly asks for prices or packages. Mentioning `وايلد ريفت` alone asks for the package instead of sending an image.
-4. Uses Gemini only when deterministic business logic cannot answer naturally.
-5. Learns safely from chat by storing recent messages as context and creating FAQ suggestions from unanswered questions or admin replies. Suggestions must be approved in the dashboard before becoming official knowledge.
-
-Important flow rules:
-
-- Wild Rift never needs region; ask for package only.
-- Valorant needs region and package.
-- League RP needs server and package.
-- Never invent prices or stock. Use media catalog images or ask a clarifying question.
-
 ## Required Env Vars
 
 - `DATABASE_URL`
@@ -286,3 +268,13 @@ npm run lint
 npm run dashboard:build
 npx prisma validate
 ```
+
+## Production behavior update
+
+- `https://www.thenexus.ink/` is used for account-selling submissions only.
+- Normal top-up credentials are never requested in WhatsApp chat; sensitive access goes to admin handoff.
+- Specific known SKU prices can be answered in text. General price requests still send the pricing image.
+- Payment proof, delays, and complaints are routed to admin review.
+- Sellers who do not know an account price should enter `0` in expected payout.
+- First/Original Email explanation is built into the bot.
+

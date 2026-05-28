@@ -24,7 +24,7 @@ export interface IntentResult {
 }
 
 const includesAny = (text: string, needles: string[]) =>
-  needles.some((needle) => text.includes(needle));
+  needles.some((needle) => text.includes(normalizeForIntent(needle)));
 
 export function normalizeForIntent(text: string): string {
   return text
@@ -32,8 +32,25 @@ export function normalizeForIntent(text: string): string {
     .replace(/[إأآ]/g, 'ا')
     .replace(/ى/g, 'ي')
     .replace(/ة/g, 'ه')
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/[()\[\]{}'"`~!@#$%^&*_+=|\\/:;<>?,.،؟-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+export function compactArabic(text: string): string {
+  return normalizeForIntent(text).replace(/\s+/g, '');
+}
+
+function hasGameAlias(text: string, aliases: string[]) {
+  const normalized = normalizeForIntent(text);
+  const compact = compactArabic(text);
+
+  return aliases.some((alias) => {
+    const aliasNormalized = normalizeForIntent(alias);
+    const aliasCompact = aliasNormalized.replace(/\s+/g, '');
+    return normalized.includes(aliasNormalized) || compact.includes(aliasCompact);
+  });
 }
 
 export function hasUnknownAccountPrice(text: string): boolean {
@@ -53,7 +70,19 @@ export function hasUnknownAccountPrice(text: string): boolean {
 
 export function asksForPrice(text: string): boolean {
   const normalized = normalizeForIntent(text);
-  return includesAny(normalized, ['price', 'cost', 'بكام', 'كام', 'سعر', 'اسعار', 'الاسعار']);
+  return includesAny(normalized, [
+    'price',
+    'cost',
+    'بكام',
+    'كام',
+    'سعر',
+    'اسعار',
+    'الاسعار',
+    'الاسعار',
+    'قائمه اسعار',
+    'ابعت الاسعار',
+    'price list'
+  ]);
 }
 
 export function classifyIntent(text: string): IntentResult {
@@ -73,6 +102,8 @@ export function classifyIntent(text: string): IntentResult {
       'عامل ايه',
       'hi',
       'hello',
+      'اهلا',
+      'هلا',
       'صباح الخير',
       'صباح النور',
       'مساء الخير',
@@ -82,13 +113,15 @@ export function classifyIntent(text: string): IntentResult {
     return { name: 'greeting', confidence: 0.98, entities };
   }
 
-  if (includesAny(normalized, ['wild rift', 'وايلد ريفت', 'وايلد', 'wr'])) {
+  if (hasGameAlias(text, ['wild rift', 'وايلد ريفت', 'وايلدرفت', 'وايلد', 'wr'])) {
     entities.game = 'wild_rift';
-  } else if (includesAny(normalized, ['valorant', 'فالورانت', 'فال', 'val', 'vp'])) {
+  } else if (hasGameAlias(text, ['valorant', 'فالورانت', 'فالورنت', 'فال', 'val', 'vp'])) {
     entities.game = 'valorant';
-  } else if (includesAny(normalized, ['league', 'lol', 'ليج', 'ليج اوف ليجندز', 'rp', 'ار بي'])) {
+  } else if (
+    hasGameAlias(text, ['league', 'lol', 'ليج', 'ليج اوف ليجندز', 'league of legends', 'rp', 'ار بي'])
+  ) {
     entities.game = 'league';
-  } else if (includesAny(normalized, ['clash', 'كلاش'])) {
+  } else if (hasGameAlias(text, ['clash', 'كلاش'])) {
     entities.game = 'clash';
   }
 
@@ -119,7 +152,7 @@ export function classifyIntent(text: string): IntentResult {
     return { name: 'human_handoff', confidence: 0.94, entities };
   }
 
-  if (includesAny(normalized, ['مشكله', 'مشكلة', 'شكوي', 'شكوى', 'اتأخر', 'متاخر', 'غلط'])) {
+  if (includesAny(normalized, ['مشكله', 'مشكلة', 'شكوي', 'شكوى', 'اتاخر', 'متاخر', 'غلط'])) {
     return { name: 'complaint', confidence: 0.88, entities };
   }
 
@@ -179,6 +212,8 @@ export function classifyIntent(text: string): IntentResult {
       'شحن',
       'اشحن',
       'عايز اشحن',
+      'عاوز اشحن',
+      'محتاج اشحن',
       'بكام',
       'اسعار',
       'الاسعار',
