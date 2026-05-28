@@ -51,6 +51,10 @@ export class WhatsAppCloudClient implements WhatsAppClient {
   }
 
   async sendText(to: string, body: string): Promise<WhatsAppSendResult> {
+    if (to.startsWith('messenger:')) {
+      return this.sendMessengerText(to.replace(/^messenger:/, ''), body);
+    }
+
     return this.sendMessage('text', {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -64,6 +68,10 @@ export class WhatsAppCloudClient implements WhatsAppClient {
   }
 
   async sendImage(to: string, imageUrl: string, caption?: string): Promise<WhatsAppSendResult> {
+    if (to.startsWith('messenger:')) {
+      return this.sendMessengerImage(to.replace(/^messenger:/, ''), imageUrl, caption);
+    }
+
     return this.sendMessage('image', {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -74,6 +82,56 @@ export class WhatsAppCloudClient implements WhatsAppClient {
         caption
       }
     });
+  }
+
+
+  private async sendMessengerText(psid: string, body: string): Promise<WhatsAppSendResult> {
+    return this.sendMessengerMessage('text', {
+      recipient: { id: psid },
+      messaging_type: 'RESPONSE',
+      message: { text: body }
+    });
+  }
+
+  private async sendMessengerImage(psid: string, imageUrl: string, caption?: string): Promise<WhatsAppSendResult> {
+    const result = await this.sendMessengerMessage('image', {
+      recipient: { id: psid },
+      messaging_type: 'RESPONSE',
+      message: {
+        attachment: {
+          type: 'image',
+          payload: { url: imageUrl, is_reusable: true }
+        }
+      }
+    });
+
+    if (caption?.trim()) {
+      await this.sendMessengerText(psid, caption);
+    }
+
+    return result;
+  }
+
+  private async sendMessengerMessage(messageType: 'text' | 'image', payload: Record<string, unknown>): Promise<WhatsAppSendResult> {
+    if (!this.env.MESSENGER_PAGE_ACCESS_TOKEN) {
+      throw new AppError(500, 'messenger_page_token_missing', 'MESSENGER_PAGE_ACCESS_TOKEN is not configured');
+    }
+
+    const response = await fetch(`https://graph.facebook.com/${this.env.WHATSAPP_API_VERSION}/me/messages?access_token=${this.env.MESSENGER_PAGE_ACCESS_TOKEN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = (await response.json().catch(() => ({}))) as MetaErrorBody & { message_id?: string };
+
+    if (!response.ok) {
+      logger.error({ status: response.status, responseBody: data }, 'Messenger send failed');
+      throw new AppError(response.status, 'messenger_send_failed', data.error?.message ?? 'Failed to send Messenger message', data);
+    }
+
+    logger.info({ messageType, messageId: data.message_id, responseBody: data }, 'Messenger send success');
+    return { messageId: data.message_id, raw: data };
   }
 
   private async sendMessage(

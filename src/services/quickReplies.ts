@@ -10,6 +10,7 @@ import {
   FIRST_EMAIL_EXPLAIN_REPLY,
   GENERAL_TOP_UP_REPLIES,
   GREETING_REPLIES,
+  GROUP_AUTOPROMO_REPLIES,
   HUMAN_HANDOFF_REPLY,
   INSTAPAY_PAYMENT_REPLIES,
   LEAGUE_MENU_REPLIES,
@@ -21,7 +22,7 @@ import {
   PAYMENT_METHODS_REPLIES,
   PAYMENT_PROOF_REPLY,
   PRICE_SKUS,
-  RIOT_GIFT_REPLY,
+  RIOT_GIFT_ADD_ACCOUNTS_REPLY,
   UNKNOWN_GAME_TOP_UP_REPLIES,
   VALORANT_PACKAGE_CONFIRMATION_REPLIES,
   VALORANT_PRICE_CAPTION_REPLIES,
@@ -31,11 +32,14 @@ import {
   WILD_RIFT_FIND_EMAIL_REPLY,
   WILD_RIFT_FORGOT_PASSWORD_REPLY,
   WILD_RIFT_FORGOT_USERNAME_REPLY,
+  WILD_RIFT_CORE_PACKAGES,
   WILD_RIFT_GAME_REPLIES,
   WILD_RIFT_HAVE_LOGIN_REPLY,
+  WILD_RIFT_KEY_TIERS,
   WILD_RIFT_PACKAGE_CONFIRMATION_REPLIES,
   WILD_RIFT_PRICE_CAPTION_REPLIES,
-  WILD_RIFT_RIOT_ID_REPLY
+  WILD_RIFT_RIOT_ID_REPLY,
+  WILD_RIFT_SKIN_PRICES
 } from '../config/constants';
 import { env } from '../config/env';
 import { compactArabic, normalizeForIntent } from './intent';
@@ -411,6 +415,113 @@ function detectSpecificPrice(text: string, activeGame?: DetectedGame) {
   return undefined;
 }
 
+
+
+type CalculatedOffer = {
+  text: string;
+  intent: string;
+  game: DetectedGame;
+  lastAskedQuestion?: string;
+  pendingFields?: Record<string, unknown>;
+};
+
+function formatEgp(value: number) {
+  return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace(/\.00$/, '');
+}
+
+function detectWildRiftSkin(text: string): CalculatedOffer | undefined {
+  const normalized = normalizeForIntent(text);
+  const matches: Array<{ key: string; label: string; egp: number }> = [];
+
+  for (const [key, item] of Object.entries(WILD_RIFT_SKIN_PRICES)) {
+    if (item.aliases.some((alias) => fuzzyContains(normalized, alias))) {
+      matches.push({ key, label: item.label, egp: item.egp });
+    }
+  }
+
+  if (!matches.length) return undefined;
+
+  const total = matches.reduce((sum, item) => sum + item.egp, 0);
+  const lines = matches.map((item) => `- ${item.label}: ${item.egp} EGP`).join('\n');
+  return {
+    text: `تمام ❤️ دي أسعار طلبك في Wild Rift:\n${lines}\n\nالإجمالي: ${total} EGP.\nتحب تدفع على أنهي طريقة؟`,
+    intent: 'wild_rift_skin_price',
+    game: 'wild_rift',
+    lastAskedQuestion: 'payment_method',
+    pendingFields: { game: 'wild_rift', product: 'skin_or_pass', totalEgp: total, items: matches }
+  };
+}
+
+function detectWildRiftKeysOrOrange(text: string): CalculatedOffer | undefined {
+  const normalized = normalizeForIntent(text);
+  const asksOrange = hasAny(normalized, ['اورنج', 'orange', 'برتقالي', 'ميثك', 'mythic']);
+  const asksKeys = hasAny(normalized, ['مفتاح', 'مفاتيح', 'key', 'keys']);
+  if (!asksOrange && !asksKeys) return undefined;
+
+  const numbers = Array.from(text.matchAll(/\d+/g)).map((match) => Number(match[0])).filter(Boolean);
+  const amount = numbers[0];
+
+  if (asksOrange && !amount) {
+    return {
+      text: `تمام ❤️ السكنات الميثك بتحتاج Orange Essence.\nكل 100 مفتاح تقريبًا = 100 Orange.\nقولّي معاك كام Orange دلوقتي أو محتاج كام Orange، وأنا أحسبلك الباقي بالمفاتيح والسعر.`,
+      intent: 'wild_rift_orange_calc_prompt',
+      game: 'wild_rift',
+      lastAskedQuestion: 'orange_amount',
+      pendingFields: { game: 'wild_rift', product: 'orange_or_keys' }
+    };
+  }
+
+  if (!amount) {
+    return {
+      text: `تمام ❤️ المفتاح سعره بيتحدد حسب الكمية:\n- من 1 لـ 299 مفتاح: 5.8 EGP للمفتاح\n- من 300 لـ 500 مفتاح: 5.35 EGP للمفتاح\n- من 501 لـ 1000 مفتاح: 5.145 EGP للمفتاح\n\nابعت عدد المفاتيح اللي محتاجها وأنا أحسبهالك.`,
+      intent: 'wild_rift_keys_price_prompt',
+      game: 'wild_rift',
+      lastAskedQuestion: 'key_amount',
+      pendingFields: { game: 'wild_rift', product: 'keys' }
+    };
+  }
+
+  const tier = WILD_RIFT_KEY_TIERS.find((item) => amount >= item.min && amount <= item.max) ?? WILD_RIFT_KEY_TIERS[WILD_RIFT_KEY_TIERS.length - 1];
+  const total = amount * tier.pricePerKey;
+  const orangeHint = asksOrange ? `\nتقريبًا ${amount} مفتاح = ${amount} Orange.` : '';
+  return {
+    text: `تمام ❤️ ${amount} مفتاح سعرهم ${formatEgp(total)} EGP على سعر ${tier.pricePerKey} EGP للمفتاح.${orangeHint}\nلو هتاخد كمية أكبر ممكن الأدمن يراجعلك خصم أحسن.\nتحب تدفع على أنهي طريقة؟`,
+    intent: 'wild_rift_keys_price',
+    game: 'wild_rift',
+    lastAskedQuestion: 'payment_method',
+    pendingFields: { game: 'wild_rift', product: 'keys', amount, totalEgp: total }
+  };
+}
+
+function detectWildRiftCorePackage(text: string): CalculatedOffer | undefined {
+  const normalized = normalizeForIntent(text);
+  if (!detectWildRiftCores(normalized) && !hasAny(normalized, ['wc', 'wild core', 'wild cores'])) return undefined;
+  const numbers = Array.from(text.matchAll(/\d+/g)).map((match) => Number(match[0]));
+  const amount = numbers.find((num) => WILD_RIFT_CORE_PACKAGES.some((pack) => pack.amount === num));
+  if (!amount) return undefined;
+
+  const pack = WILD_RIFT_CORE_PACKAGES.find((item) => item.amount === amount)!;
+  return {
+    text: `تمام ❤️ ${pack.amount} Wild Cores سعرها ${pack.egp} EGP.\nتحب تدفع على أنهي طريقة؟ وبعد الدفع الأدمن هيكمل معاك خطوات الشحن الآمنة.`,
+    intent: 'wild_rift_core_price',
+    game: 'wild_rift',
+    lastAskedQuestion: 'payment_method',
+    pendingFields: { game: 'wild_rift', product: 'wild_cores', package: `${pack.amount} WC`, totalEgp: pack.egp }
+  };
+}
+
+function detectCompletionPhrase(text: string): CalculatedOffer | undefined {
+  const normalized = normalizeForIntent(text);
+  if (hasAny(normalized, ['وصل', 'وصلت', 'تم الشحن', 'تمام وصل', 'استلمت', 'خلص', 'وصلك'])) {
+    return {
+      text: `مبروك عليك الطلب ❤️\nلو الخدمة وصلت تمام، هنكون مبسوطين جدًا لو تسيبلنا بوست صغير في الجروب أو ترشحنا لصحابك.\nرأيك بيفرق معانا وبيطمن العملاء الجدد 🙏`,
+      intent: 'order_completed_review',
+      game: 'general'
+    };
+  }
+  return undefined;
+}
+
 function priceReplyText(sku: (typeof PRICE_SKUS)[number]) {
   const regionText = sku.region ? ` (${sku.region})` : '';
   const usdText = sku.usd ? ` / ${sku.usd}` : '';
@@ -479,7 +590,13 @@ export function detectQuickReply(
   if (greeting) return greeting;
 
   if (hasAny(normalized, paymentKeywords)) {
-    return textResult({ text: pick(PAYMENT_METHODS_REPLIES), intent: 'payment_methods' });
+    return textResult({
+      text: pick(PAYMENT_METHODS_REPLIES),
+      intent: 'payment_methods',
+      game: memoryGame,
+      lastAskedQuestion: 'payment_method',
+      pendingFields: pendingFields(memory.pendingFields, { awaitingPaymentMethod: true })
+    });
   }
 
   if (hasAny(normalized, paymentProofKeywords)) {
@@ -512,7 +629,7 @@ export function detectQuickReply(
     });
   }
 
-  if (memory.lastAskedQuestion === 'payment_method' && hasAny(normalized, vodafoneKeywords)) {
+  if (hasAny(normalized, vodafoneKeywords)) {
     return textResult({
       text: pick(VODAFONE_PAYMENT_REPLIES),
       intent: 'payment_method_selected',
@@ -521,7 +638,7 @@ export function detectQuickReply(
     });
   }
 
-  if (memory.lastAskedQuestion === 'payment_method' && hasAny(normalized, instapayKeywords)) {
+  if (hasAny(normalized, instapayKeywords)) {
     return textResult({
       text: pick(INSTAPAY_PAYMENT_REPLIES),
       intent: 'payment_method_selected',
@@ -609,7 +726,45 @@ export function detectQuickReply(
   }
 
   if (hasAny(normalized, riotGiftKeywords) && !game) {
-    return textResult({ text: RIOT_GIFT_REPLY, intent: 'riot_gift' });
+    return textResult({ text: RIOT_GIFT_ADD_ACCOUNTS_REPLY, intent: 'riot_gift' });
+  }
+
+  const completion = detectCompletionPhrase(text);
+  if (completion) {
+    return textResult({ text: completion.text, intent: completion.intent, game: completion.game });
+  }
+
+  const wrSkinOffer = detectWildRiftSkin(text);
+  if (wrSkinOffer) {
+    return textResult({
+      text: wrSkinOffer.text,
+      intent: wrSkinOffer.intent,
+      game: wrSkinOffer.game,
+      lastAskedQuestion: wrSkinOffer.lastAskedQuestion,
+      pendingFields: pendingFields(memory.pendingFields, wrSkinOffer.pendingFields ?? {})
+    });
+  }
+
+  const wrKeyOffer = detectWildRiftKeysOrOrange(text);
+  if (wrKeyOffer) {
+    return textResult({
+      text: wrKeyOffer.text,
+      intent: wrKeyOffer.intent,
+      game: wrKeyOffer.game,
+      lastAskedQuestion: wrKeyOffer.lastAskedQuestion,
+      pendingFields: pendingFields(memory.pendingFields, wrKeyOffer.pendingFields ?? {})
+    });
+  }
+
+  const wrCoreOffer = detectWildRiftCorePackage(text);
+  if (wrCoreOffer) {
+    return textResult({
+      text: wrCoreOffer.text,
+      intent: wrCoreOffer.intent,
+      game: wrCoreOffer.game,
+      lastAskedQuestion: wrCoreOffer.lastAskedQuestion,
+      pendingFields: pendingFields(memory.pendingFields, wrCoreOffer.pendingFields ?? {})
+    });
   }
 
   const specificSku = detectSpecificPrice(text, game ?? memoryGame);

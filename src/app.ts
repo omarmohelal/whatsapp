@@ -12,6 +12,7 @@ import { logger as defaultLogger, type AppLogger } from './logger';
 import { adminAuth } from './middleware/adminAuth';
 import { createAdminRouter } from './routes/admin';
 import { createDebugRouter } from './routes/debug';
+import { createMessengerWebhookRouter } from './routes/messengerWebhook';
 import { createWhatsAppWebhookRouter } from './routes/whatsappWebhook';
 import type { AgentService } from './services/agent';
 import type { KnowledgeService } from './services/knowledge';
@@ -79,6 +80,15 @@ export function createApp(deps: AppDeps = {}) {
 
   app.use(
     createWhatsAppWebhookRouter({
+      env: appEnv,
+      logger: appLogger,
+      incomingQueue: deps.queues?.incomingMessages,
+      agent: deps.agent
+    })
+  );
+
+  app.use(
+    createMessengerWebhookRouter({
       env: appEnv,
       logger: appLogger,
       incomingQueue: deps.queues?.incomingMessages,
