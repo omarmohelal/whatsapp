@@ -1,15 +1,50 @@
+import crypto from 'crypto';
 import { Router } from 'express';
 import type { Queue } from 'bullmq';
+import { z } from 'zod';
+import type { Env } from '../config/env';
 import type { AppLogger } from '../logger';
 import type { AgentService } from '../services/agent';
 import type { IncomingWhatsAppJob, WhatsAppWebhookPayload } from '../types/whatsapp';
 import { asyncHandler } from '../utils/asyncHandler';
 
 interface WhatsAppWebhookRouterDeps {
-  verifyToken: string;
+  env: Env;
   logger: AppLogger;
   incomingQueue?: Queue;
   agent?: Pick<AgentService, 'handleIncomingMessage'>;
+}
+
+interface RawBodyRequest {
+  headers: Record<string, unknown>;
+  rawBody?: Buffer;
+}
+
+const payloadSchema = z.object({
+  object: z.string().optional(),
+  entry: z.array(z.unknown()).optional()
+});
+
+function verifyMetaSignature(req: { headers: Record<string, unknown>; rawBody?: Buffer }, secret?: string) {
+  if (!secret) {
+    return true;
+  }
+
+  const signature = req.headers['x-hub-signature-256'];
+  if (typeof signature !== 'string' || !signature.startsWith('sha256=')) {
+    return false;
+  }
+
+  const rawBody = req.rawBody;
+  if (!rawBody) {
+    return false;
+  }
+
+  const expected = `sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`;
+  const left = Buffer.from(signature);
+  const right = Buffer.from(expected);
+
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
 export function extractIncomingMessages(payload: WhatsAppWebhookPayload): IncomingWhatsAppJob[] {
@@ -55,7 +90,7 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps) {
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    if (mode === 'subscribe' && token === deps.verifyToken && typeof challenge === 'string') {
+    if (mode === 'subscribe' && token === deps.env.WHATSAPP_VERIFY_TOKEN && typeof challenge === 'string') {
       res.status(200).send(challenge);
       return;
     }
@@ -66,24 +101,42 @@ export function createWhatsAppWebhookRouter(deps: WhatsAppWebhookRouterDeps) {
   router.post(
     '/webhooks/whatsapp',
     asyncHandler(async (req, res) => {
-      const payload = req.body as WhatsAppWebhookPayload;
-      const jobs = extractIncomingMessages(payload);
+      if (!verifyMetaSignature(req as unknown as RawBodyRequest, deps.env.META_APP_SECRET)) {
+        deps.logger.warn('Rejected WhatsApp webhook with invalid Meta signature');
+        res.sendStatus(403);
+        return;
+      }
+
+      const validation = payloadSchema.safeParse(req.body);
+      if (!validation.success) {
+        deps.logger.warn({ details: validation.error.flatten() }, 'Invalid WhatsApp webhook payload');
+        res.status(200).json({ ok: true, accepted: 0 });
+        return;
+      }
+
+      const jobs = extractIncomingMessages(req.body as WhatsAppWebhookPayload);
 
       for (const job of jobs) {
-        if (deps.incomingQueue) {
-          await deps.incomingQueue.add('incoming_message', job, {
-            attempts: 5,
-            backoff: {
-              type: 'exponential',
-              delay: 1000
-            },
-            removeOnComplete: true,
-            removeOnFail: 500
-          });
-        } else if (deps.agent) {
-          await deps.agent.handleIncomingMessage(job);
-        } else {
-          deps.logger.warn('Webhook received with no queue or agent configured');
+        deps.logger.info({ messageId: job.messageId, waId: job.waId }, 'Incoming webhook message received');
+        try {
+          if (deps.incomingQueue) {
+            await deps.incomingQueue.add('incoming_message', job, {
+              attempts: 3,
+              backoff: {
+                type: 'exponential',
+                delay: 1000
+              },
+              removeOnComplete: true,
+              removeOnFail: 500
+            });
+            deps.logger.info({ messageId: job.messageId }, 'Queue job created');
+          } else if (deps.agent) {
+            await deps.agent.handleIncomingMessage(job);
+          } else {
+            deps.logger.warn('Webhook received with no queue or agent configured');
+          }
+        } catch (error) {
+          deps.logger.error({ err: error, messageId: job.messageId }, 'Failed to enqueue webhook job');
         }
       }
 

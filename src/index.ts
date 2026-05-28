@@ -6,14 +6,14 @@ import { createApp } from './app';
 import { AgentService } from './services/agent';
 import { KnowledgeService } from './services/knowledge';
 import { MediaCatalogService } from './services/mediaCatalog';
-import { OpenAiService } from './services/openai';
+import { GeminiService } from './services/gemini';
 import { WhatsAppCloudClient } from './services/whatsapp';
 
 async function main() {
   const queues = createQueues(env);
   await scheduleRecurringJobs(queues);
 
-  const ai = new OpenAiService(env);
+  const ai = new GeminiService(env, logger);
   const whatsapp = new WhatsAppCloudClient(env);
   const knowledge = new KnowledgeService(prisma, ai);
   const agent = new AgentService({

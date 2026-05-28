@@ -6,7 +6,7 @@ export interface SensitiveCredentialDetection {
 }
 
 const passwordValuePatterns = [
-  /(password|pass|pwd|باسورد|الباسورد|كلمة\s*السر|كلمه\s*السر)\s*[:=-]?\s*([^\s,;]+)/giu,
+  /(password|pass|pwd|باس|باسورد|الباسورد|كلمة\s*السر|كلمه\s*السر)\s*[:=-]?\s*([^\s,;]+)/giu,
   /(otp|2fa|code|كود|رمز)\s*[:=-]?\s*(\d{4,8})/giu
 ];
 
@@ -17,12 +17,13 @@ const providerMatchers: Array<{
   { type: 'riot', pattern: /\b(riot|league|valorant|wild\s*rift|ريوت|فالورانت)\b/iu },
   { type: 'gmail', pattern: /\b(gmail|google|جيميل)\b/iu },
   { type: 'facebook', pattern: /\b(facebook|fb|فيسبوك|فيس)\b/iu },
-  { type: 'apple', pattern: /\b(apple|icloud|ابل|آبل|ايكلاود)\b/iu }
+  { type: 'apple', pattern: /\b(apple\s*id|apple|icloud|ابل|آبل|ايكلاود)\b/iu }
 ];
 
-const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
+const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu;
+const phonePattern = /\b(?:\+?20|0)?1[0125]\d{8}\b/g;
 const accountKeywordPattern =
-  /\b(login|log\s*in|account|email|user(name)?|اكونت|أكونت|حساب|ايميل|يوزر)\b/iu;
+  /\b(login|log\s*in|account|email|user(name)?|gmail|facebook|apple\s*id|riot\s*account|يوزر|اكونت|أكونت|حساب|ايميل|باس|باسورد)\b/iu;
 
 export function maskSensitiveText(input: string): string {
   let masked = input;
@@ -34,6 +35,12 @@ export function maskSensitiveText(input: string): string {
   return masked;
 }
 
+export function maskCustomerIdentifiers(input: string): string {
+  return maskSensitiveText(input)
+    .replace(emailPattern, '[EMAIL]')
+    .replace(phonePattern, '[PHONE]');
+}
+
 export function detectSensitiveCredentials(input: string): SensitiveCredentialDetection {
   const reasons: string[] = [];
   const hasPasswordLikeValue = passwordValuePatterns.some((pattern) => {
@@ -41,6 +48,7 @@ export function detectSensitiveCredentials(input: string): SensitiveCredentialDe
     return pattern.test(input);
   });
   const hasEmail = emailPattern.test(input);
+  emailPattern.lastIndex = 0;
   const hasAccountKeyword = accountKeywordPattern.test(input);
   const provider = providerMatchers.find((matcher) => matcher.pattern.test(input));
 
@@ -55,7 +63,7 @@ export function detectSensitiveCredentials(input: string): SensitiveCredentialDe
   }
 
   const isSensitive =
-    hasPasswordLikeValue && (hasEmail || hasAccountKeyword || Boolean(provider));
+    hasPasswordLikeValue || (hasAccountKeyword && Boolean(provider)) || (hasEmail && hasAccountKeyword);
 
   return {
     isSensitive,

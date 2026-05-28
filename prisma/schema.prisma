@@ -82,6 +82,8 @@ model Business {
   knowledgeChunks   KnowledgeChunk[]
   mediaCatalogItems MediaCatalogItem[]
   faqSuggestions    FaqSuggestion[]
+  paymentMethods    PaymentMethod[]
+  adminSettings     AdminSetting[]
 
   @@map("businesses")
 }
@@ -129,7 +131,16 @@ model Conversation {
   handoffReason     String?                    @map("handoff_reason")
   needsHumanPricing Boolean                    @default(false) @map("needs_human_pricing")
   needsHumanSales   Boolean                    @default(false) @map("needs_human_sales")
+  needsHuman        Boolean                    @default(false) @map("needs_human")
+  aiEnabled         Boolean                    @default(true) @map("ai_enabled")
   isSensitive       Boolean                    @default(false) @map("is_sensitive")
+  unreadCount       Int                        @default(0) @map("unread_count")
+  lastIntent        String?                    @map("last_intent")
+  detectedGame      String?                    @map("detected_game")
+  customerName      String?                    @map("customer_name")
+  lastAskedQuestion String?                    @map("last_asked_question")
+  lastInboundAt     DateTime?                  @map("last_inbound_at")
+  firstResponseAt   DateTime?                  @map("first_response_at")
   lastMessageAt     DateTime                   @default(now()) @map("last_message_at")
   createdAt         DateTime                   @default(now()) @map("created_at")
   updatedAt         DateTime                   @updatedAt @map("updated_at")
@@ -159,6 +170,8 @@ model Message {
   mediaUrl                    String?                    @map("media_url")
   metadata                    Json?
   containsSensitiveCredential Boolean                    @default(false) @map("contains_sensitive_credential")
+  aiGenerated                 Boolean                    @default(false) @map("ai_generated")
+  intent                      String?
   createdAt                   DateTime                   @default(now()) @map("created_at")
   conversation                Conversation               @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   contact                     Contact?                   @relation(fields: [contactId], references: [id], onDelete: SetNull)
@@ -213,7 +226,7 @@ model KnowledgeChunk {
   businessId String                    @map("business_id") @db.Uuid
   documentId String                    @map("document_id") @db.Uuid
   content    String
-  embedding  Unsupported("vector(1536)")?
+  embedding  Unsupported("vector(768)")?
   metadata   Json?
   createdAt  DateTime                  @default(now()) @map("created_at")
   business   Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -228,9 +241,12 @@ model MediaCatalogItem {
   id         String   @id @default(uuid()) @db.Uuid
   businessId String   @map("business_id") @db.Uuid
   key        String
+  game       String?
   title      String
+  caption    String?
   imageUrl   String?  @map("image_url")
   aliases    String[] @default([])
+  isActive   Boolean  @default(true) @map("is_active")
   metadata   Json?
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -239,6 +255,35 @@ model MediaCatalogItem {
   @@unique([businessId, key])
   @@index([businessId])
   @@map("media_catalog_items")
+}
+
+model PaymentMethod {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  label      String
+  value      String
+  isActive   Boolean  @default(true) @map("is_active")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, isActive])
+  @@map("payment_methods")
+}
+
+model AdminSetting {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  key        String
+  value      Json
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, key])
+  @@index([businessId])
+  @@map("admin_settings")
 }
 
 model AdminUser {

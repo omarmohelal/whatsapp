@@ -6,7 +6,7 @@ import { AgentService } from '../services/agent';
 import { KnowledgeService } from '../services/knowledge';
 import { LearningService } from '../services/learning';
 import { MediaCatalogService } from '../services/mediaCatalog';
-import { OpenAiService } from '../services/openai';
+import { GeminiService } from '../services/gemini';
 import { deleteExpiredSensitiveCredentialData } from '../services/sensitiveDataTtl';
 import { WhatsAppCloudClient } from '../services/whatsapp';
 import { createQueues, createRedisConnection, scheduleRecurringJobs } from './queues';
@@ -15,7 +15,7 @@ async function main() {
   const queues = createQueues(env);
   await scheduleRecurringJobs(queues);
 
-  const ai = new OpenAiService(env);
+  const ai = new GeminiService(env, logger);
   const knowledge = new KnowledgeService(prisma, ai);
   const agent = new AgentService({
     prisma,
@@ -32,6 +32,7 @@ async function main() {
   const incomingWorker = new Worker(
     'incoming-whatsapp-messages',
     async (job) => {
+      logger.info({ jobId: job.id, messageId: job.data.messageId }, 'Worker picked WhatsApp job');
       await agent.handleIncomingMessage(job.data);
     },
     {

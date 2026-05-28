@@ -1,13 +1,16 @@
 import type { PrismaClient } from '@prisma/client';
 import defaultCatalog from '../../knowledge/media-catalog.json';
 import type { Env } from '../config/env';
-import type { IntentResult } from './intent';
+import { normalizeForIntent, type IntentResult } from './intent';
 
 export interface MediaCatalogEntry {
   key: string;
+  game?: string | null;
   title: string;
+  caption?: string | null;
   imageUrl?: string | null;
   aliases: string[];
+  isActive?: boolean;
 }
 
 function resolvePlaceholders(value: string | undefined | null, env: Env): string | undefined {
@@ -21,8 +24,14 @@ function resolvePlaceholders(value: string | undefined | null, env: Env): string
 export function loadDefaultMediaCatalog(env: Env): MediaCatalogEntry[] {
   return (defaultCatalog as MediaCatalogEntry[]).map((item) => ({
     ...item,
-    imageUrl: resolvePlaceholders(item.imageUrl, env)
+    imageUrl: resolvePlaceholders(item.imageUrl, env),
+    isActive: item.isActive ?? true
   }));
+}
+
+export function matchesMediaItem(text: string, item: MediaCatalogEntry): boolean {
+  const normalized = normalizeForIntent(text);
+  return item.aliases.some((alias) => normalized.includes(normalizeForIntent(alias)));
 }
 
 export function catalogKeyForIntent(intent: IntentResult, text: string): string {
@@ -39,21 +48,11 @@ export function catalogKeyForIntent(intent: IntentResult, text: string): string 
     return 'clash_shipping';
   }
 
-  const normalized = text.toLowerCase();
-  if (normalized.includes('wild rift') || normalized.includes('وايلد ريفت')) {
-    return 'wild_rift_shipping';
-  }
-  if (normalized.includes('rp') || normalized.includes('league') || normalized.includes('ليج')) {
-    return 'league_rp';
-  }
-  if (normalized.includes('valorant') || normalized.includes('فالورانت') || normalized.includes('فال') || normalized.includes(' vp')) {
-    return 'valorant_vp';
-  }
-  if (normalized.includes('clash') || normalized.includes('كلاش')) {
-    return 'clash_shipping';
-  }
+  const catalogMatch = (defaultCatalog as MediaCatalogEntry[]).find(
+    (item) => item.key !== 'general_games' && matchesMediaItem(text, item)
+  );
 
-  return 'general_games';
+  return catalogMatch?.key ?? 'general_games';
 }
 
 export class MediaCatalogService {
@@ -62,33 +61,44 @@ export class MediaCatalogService {
     private readonly env: Env
   ) {}
 
+  async findByText(businessId: string, text: string): Promise<MediaCatalogEntry | null> {
+    const catalog = await this.listActive(businessId);
+    return catalog.find((item) => item.key !== 'general_games' && matchesMediaItem(text, item)) ?? null;
+  }
+
   async findForIntent(args: {
     businessId: string;
     intent: IntentResult;
     text: string;
   }): Promise<MediaCatalogEntry | null> {
     const key = catalogKeyForIntent(args.intent, args.text);
+    const catalog = await this.listActive(args.businessId);
+    return catalog.find((item) => item.key === key) ?? null;
+  }
 
+  async listActive(businessId: string): Promise<MediaCatalogEntry[]> {
     if (this.prisma) {
-      const dbItem = await this.prisma.mediaCatalogItem.findUnique({
+      const dbItems = await this.prisma.mediaCatalogItem.findMany({
         where: {
-          businessId_key: {
-            businessId: args.businessId,
-            key
-          }
-        }
+          businessId,
+          isActive: true
+        },
+        orderBy: { key: 'asc' }
       });
 
-      if (dbItem) {
-        return {
-          key: dbItem.key,
-          title: dbItem.title,
-          imageUrl: resolvePlaceholders(dbItem.imageUrl, this.env),
-          aliases: dbItem.aliases
-        };
+      if (dbItems.length) {
+        return dbItems.map((item) => ({
+          key: item.key,
+          game: item.game,
+          title: item.title,
+          caption: item.caption,
+          imageUrl: resolvePlaceholders(item.imageUrl, this.env),
+          aliases: item.aliases,
+          isActive: item.isActive
+        }));
       }
     }
 
-    return loadDefaultMediaCatalog(this.env).find((item) => item.key === key) ?? null;
+    return loadDefaultMediaCatalog(this.env).filter((item) => item.isActive !== false);
   }
 }

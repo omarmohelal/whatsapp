@@ -4,7 +4,7 @@ import { prisma } from '../db/prisma';
 import { logger } from '../logger';
 import { KnowledgeService } from '../services/knowledge';
 import { loadDefaultMediaCatalog } from '../services/mediaCatalog';
-import { OpenAiService } from '../services/openai';
+import { GeminiService } from '../services/gemini';
 
 const initialKnowledge = [
   {
@@ -166,15 +166,61 @@ async function main() {
       create: {
         businessId: business.id,
         key: item.key,
+        game: item.game,
         title: item.title,
+        caption: item.caption,
         imageUrl: item.imageUrl,
-        aliases: item.aliases
+        aliases: item.aliases,
+        isActive: item.isActive ?? true
       },
       update: {
+        game: item.game,
         title: item.title,
+        caption: item.caption,
         imageUrl: item.imageUrl,
-        aliases: item.aliases
+        aliases: item.aliases,
+        isActive: item.isActive ?? true
       }
+    });
+  }
+
+  const paymentMethods = [
+    { label: 'Crypto / Binance', value: 'Crypto / Binance', sortOrder: 1 },
+    { label: 'Credit Card', value: 'Credit Card', sortOrder: 2 },
+    { label: 'PayPal', value: 'PayPal', sortOrder: 3 },
+    { label: 'Payoneer', value: 'Payoneer', sortOrder: 4 },
+    { label: 'Vodafone Cash', value: '01007208978', sortOrder: 5 },
+    { label: 'InstaPay', value: '01014094664', sortOrder: 6 }
+  ];
+
+  await prisma.paymentMethod.deleteMany({ where: { businessId: business.id } });
+  await prisma.paymentMethod.createMany({
+    data: paymentMethods.map((method) => ({
+      businessId: business.id,
+      ...method,
+      isActive: true
+    }))
+  });
+
+  for (const [key, value] of Object.entries({
+    defaultLanguage: 'egyptian_arabic',
+    agentTone: 'short_warm_professional_sales_friendly',
+    secureFormUrl: env.SECURE_FORM_URL,
+    adminNotificationNumber: env.ADMIN_NOTIFICATION_NUMBER
+  })) {
+    await prisma.adminSetting.upsert({
+      where: {
+        businessId_key: {
+          businessId: business.id,
+          key
+        }
+      },
+      create: {
+        businessId: business.id,
+        key,
+        value
+      },
+      update: { value }
     });
   }
 
@@ -184,9 +230,13 @@ async function main() {
   }
 
   if (process.env.SEED_REINDEX !== 'false') {
-    const knowledge = new KnowledgeService(prisma, new OpenAiService(env));
+    const knowledge = new KnowledgeService(prisma, new GeminiService(env, logger));
     for (const doc of documents) {
-      await knowledge.reindexDocument(doc.id);
+      try {
+        await knowledge.reindexDocument(doc.id);
+      } catch (error) {
+        logger.warn({ err: error, documentId: doc.id }, 'Seed reindex failed; continuing');
+      }
     }
   }
 

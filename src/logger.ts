@@ -1,6 +1,6 @@
 import pino from 'pino';
 import { env } from './config/env';
-import { maskSensitiveText } from './services/credentials';
+import { maskCustomerIdentifiers } from './services/credentials';
 
 export const logger = pino({
   level: env.LOG_LEVEL,
@@ -13,13 +13,13 @@ export const logger = pino({
       '*.access_token',
       '*.token',
       '*.WHATSAPP_ACCESS_TOKEN',
-      '*.OPENAI_API_KEY'
+      '*.GEMINI_API_KEY'
     ],
     censor: '[REDACTED]'
   },
   serializers: {
     msg(value) {
-      return typeof value === 'string' ? maskSensitiveText(value) : value;
+      return typeof value === 'string' ? maskCustomerIdentifiers(value) : value;
     }
   }
 });

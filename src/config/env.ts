@@ -10,6 +10,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.string().default('info'),
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
+  DASHBOARD_ORIGIN: z.string().url().default('http://localhost:3001'),
   CDN_BASE_URL: z.string().url().default('https://cdn.example.com/thenexus'),
   DATABASE_URL: z
     .string()
@@ -17,14 +18,13 @@ const envSchema = z.object({
     .default(isTest ? 'postgresql://postgres:postgres@localhost:5432/thenexus_test' : ''),
   REDIS_URL: z.string().url().default(isTest ? 'redis://localhost:6379' : 'redis://redis:6379'),
   ADMIN_API_KEY: z.string().min(16).default(isTest ? 'test-admin-api-key-123456' : ''),
+  ADMIN_NOTIFICATION_NUMBER: z.string().optional().default(''),
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).default(isTest ? 'verify-token' : ''),
   WHATSAPP_ACCESS_TOKEN: z.string().min(1).default(isTest ? 'wa-token' : ''),
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).default(isTest ? 'phone-id' : ''),
   WHATSAPP_API_VERSION: z.string().default('v21.0'),
-  OPENAI_API_KEY: z.string().optional().default(isTest ? 'test-openai-key' : ''),
-  OPENAI_CHAT_MODEL: z.string().default('gpt-4o-mini'),
-  OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
-  GEMINI_API_KEY: z.string().optional().default(''),
+  META_APP_SECRET: z.string().optional().default(''),
+  GEMINI_API_KEY: z.string().min(1).default(isTest ? 'test-gemini-key' : ''),
   GEMINI_CHAT_MODEL: z.string().default('gemini-1.5-flash'),
   GEMINI_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
   ENCRYPTION_KEY: z.string().min(16).default(isTest ? 'test-encryption-key-that-is-long-enough' : ''),
@@ -39,11 +39,5 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration: ${JSON.stringify(details)}`);
 }
 
-const data = parsed.data;
-
-if (!isTest && !data.OPENAI_API_KEY && !data.GEMINI_API_KEY) {
-  throw new Error('Invalid environment configuration: set GEMINI_API_KEY or OPENAI_API_KEY');
-}
-
-export const env = data;
+export const env = parsed.data;
 export type Env = typeof env;

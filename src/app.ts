@@ -1,6 +1,7 @@
 import compression from 'compression';
 import cors from 'cors';
 import express, { type ErrorRequestHandler } from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import { ZodError } from 'zod';
@@ -35,22 +36,49 @@ export function createApp(deps: AppDeps = {}) {
 
   app.disable('x-powered-by');
   app.use(helmet());
-  app.use(cors());
+  app.use(
+    cors({
+      origin:
+        appEnv.NODE_ENV === 'production'
+          ? [appEnv.DASHBOARD_ORIGIN]
+          : true,
+      credentials: true
+    })
+  );
   app.use(compression());
   app.use(
     pinoHttp({
       logger: appLogger
     })
   );
-  app.use(express.json({ limit: '2mb' }));
+  app.use(
+    express.json({
+      limit: '2mb',
+      verify: (req, _res, buf) => {
+        (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+      }
+    })
+  );
 
   app.get('/healthz', (_req, res) => {
     res.json({ ok: true });
   });
+  app.get('/health', (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.post('/admin/login', (req, res) => {
+    const apiKey =
+      typeof req.body?.apiKey === 'string'
+        ? req.body.apiKey
+        : req.header('x-admin-api-key') ?? req.header('authorization')?.replace(/^Bearer\s+/i, '');
+
+    res.json({ ok: apiKey === appEnv.ADMIN_API_KEY });
+  });
 
   app.use(
     createWhatsAppWebhookRouter({
-      verifyToken: appEnv.WHATSAPP_VERIFY_TOKEN,
+      env: appEnv,
       logger: appLogger,
       incomingQueue: deps.queues?.incomingMessages,
       agent: deps.agent
@@ -59,8 +87,18 @@ export function createApp(deps: AppDeps = {}) {
 
   if (deps.admin) {
     app.use(
+      '/admin',
+      rateLimit({
+        windowMs: 60_000,
+        limit: 120,
+        standardHeaders: true,
+        legacyHeaders: false
+      })
+    );
+    app.use(
       adminAuth(appEnv.ADMIN_API_KEY),
       createAdminRouter({
+        env: appEnv,
         ...deps.admin,
         learningQueue: deps.queues?.learning
       })

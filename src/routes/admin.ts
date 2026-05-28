@@ -3,12 +3,14 @@ import type { Queue } from 'bullmq';
 import { Router } from 'express';
 import { z } from 'zod';
 import { DEFAULT_BUSINESS } from '../config/constants';
+import type { Env } from '../config/env';
 import type { KnowledgeService } from '../services/knowledge';
 import type { WhatsAppClient } from '../services/whatsapp';
 import { asyncHandler } from '../utils/asyncHandler';
 import { badRequest, notFound } from '../utils/errors';
 
 interface AdminRouterDeps {
+  env: Env;
   prisma: PrismaClient;
   knowledge: KnowledgeService;
   whatsapp: WhatsAppClient;
@@ -26,7 +28,12 @@ const createKnowledgeSchema = z.object({
 const patchKnowledgeSchema = createKnowledgeSchema.partial();
 const handoffSchema = z.object({
   reason: z.string().min(2).default('admin_requested'),
-  active: z.boolean().default(true)
+  active: z.boolean().optional(),
+  done: z.boolean().optional(),
+  sensitive: z.boolean().optional()
+});
+const aiToggleSchema = z.object({
+  enabled: z.boolean()
 });
 const adminReplySchema = z
   .object({
@@ -39,6 +46,33 @@ const adminReplySchema = z
   });
 const handoffStatusQuerySchema = z.nativeEnum(HandoffStatus).optional();
 const faqSuggestionStatusQuerySchema = z.nativeEnum(FaqSuggestionStatus).optional();
+const mediaSchema = z.object({
+  key: z.string().min(2),
+  game: z.string().optional(),
+  title: z.string().min(2),
+  caption: z.string().optional(),
+  imageUrl: z.string().url().nullable().optional(),
+  aliases: z.array(z.string().min(1)).default([]),
+  isActive: z.boolean().default(true)
+});
+const patchMediaSchema = mediaSchema.partial();
+const settingsSchema = z.object({
+  businessName: z.string().optional(),
+  defaultLanguage: z.string().optional(),
+  agentTone: z.string().optional(),
+  secureFormUrl: z.string().url().optional(),
+  adminNotificationNumber: z.string().optional(),
+  paymentMethods: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        value: z.string().min(1),
+        isActive: z.boolean().default(true),
+        sortOrder: z.number().int().default(0)
+      })
+    )
+    .optional()
+});
 
 async function getDefaultBusiness(prisma: PrismaClient) {
   return prisma.business.upsert({
@@ -71,6 +105,16 @@ export function createAdminRouter(deps: AdminRouterDeps) {
       });
 
       res.status(201).json(document);
+    })
+  );
+
+  router.delete(
+    '/admin/knowledge/:id',
+    asyncHandler(async (req, res) => {
+      await deps.prisma.knowledgeDocument.delete({
+        where: { id: routeId(req) }
+      });
+      res.json({ ok: true });
     })
   );
 
@@ -130,6 +174,76 @@ export function createAdminRouter(deps: AdminRouterDeps) {
     })
   );
 
+  router.get(
+    '/admin/media',
+    asyncHandler(async (_req, res) => {
+      const business = await getDefaultBusiness(deps.prisma);
+      const items = await deps.prisma.mediaCatalogItem.findMany({
+        where: { businessId: business.id },
+        orderBy: { key: 'asc' }
+      });
+      res.json({ data: items });
+    })
+  );
+
+  router.post(
+    '/admin/media',
+    asyncHandler(async (req, res) => {
+      const body = mediaSchema.parse(req.body);
+      const business = await getDefaultBusiness(deps.prisma);
+      const item = await deps.prisma.mediaCatalogItem.create({
+        data: {
+          businessId: business.id,
+          ...body
+        }
+      });
+      res.status(201).json(item);
+    })
+  );
+
+  router.patch(
+    '/admin/media/:id',
+    asyncHandler(async (req, res) => {
+      const body = patchMediaSchema.parse(req.body);
+      const item = await deps.prisma.mediaCatalogItem.update({
+        where: { id: routeId(req) },
+        data: body
+      });
+      res.json(item);
+    })
+  );
+
+  router.delete(
+    '/admin/media/:id',
+    asyncHandler(async (req, res) => {
+      await deps.prisma.mediaCatalogItem.delete({
+        where: { id: routeId(req) }
+      });
+      res.json({ ok: true });
+    })
+  );
+
+  router.post(
+    '/admin/media/:id/test-send',
+    asyncHandler(async (req, res) => {
+      const item = await deps.prisma.mediaCatalogItem.findUnique({
+        where: { id: routeId(req) }
+      });
+      if (!item?.imageUrl) {
+        throw badRequest('Media item must have an imageUrl');
+      }
+      const to =
+        typeof req.body?.to === 'string' && req.body.to.trim()
+          ? req.body.to.trim()
+          : deps.env.ADMIN_NOTIFICATION_NUMBER;
+      if (!to) {
+        throw badRequest('Admin notification number is not configured');
+      }
+      const result = await deps.whatsapp.sendImage(to, item.imageUrl, item.caption ?? item.title);
+      res.json({ ok: true, result });
+    })
+  );
+
   router.post(
     '/admin/knowledge/reindex',
     asyncHandler(async (_req, res) => {
@@ -177,27 +291,65 @@ export function createAdminRouter(deps: AdminRouterDeps) {
     })
   );
 
+  router.get(
+    '/admin/conversations/:id',
+    asyncHandler(async (req, res) => {
+      const conversation = await deps.prisma.conversation.findUnique({
+        where: { id: routeId(req) },
+        include: {
+          contact: true,
+          messages: {
+            orderBy: { createdAt: 'asc' }
+          },
+          handoffEvents: {
+            orderBy: { createdAt: 'desc' },
+            take: 10
+          }
+        }
+      });
+      if (!conversation) {
+        throw notFound('Conversation not found');
+      }
+      res.json(conversation);
+    })
+  );
+
   router.post(
     '/admin/conversations/:id/handoff',
     asyncHandler(async (req, res) => {
       const body = handoffSchema.parse(req.body);
       const id = routeId(req);
+      const status = body.done ? 'RESOLVED' : body.active === false ? 'REQUESTED' : 'ACTIVE';
       const conversation = await deps.prisma.conversation.update({
         where: { id },
         data: {
-          handoffStatus: body.active ? 'ACTIVE' : 'REQUESTED',
-          handoffReason: body.reason
+          handoffStatus: status,
+          handoffReason: body.reason,
+          needsHuman: !body.done,
+          isSensitive: body.sensitive ?? undefined
         }
       });
 
       await deps.prisma.handoffEvent.create({
         data: {
           conversationId: conversation.id,
-          type: body.active ? 'ACTIVATED' : 'REQUESTED',
+          type: body.done ? 'RESOLVED' : status === 'ACTIVE' ? 'ACTIVATED' : 'REQUESTED',
           reason: body.reason
         }
       });
 
+      res.json(conversation);
+    })
+  );
+
+  router.post(
+    '/admin/conversations/:id/ai-toggle',
+    asyncHandler(async (req, res) => {
+      const body = aiToggleSchema.parse(req.body);
+      const conversation = await deps.prisma.conversation.update({
+        where: { id: routeId(req) },
+        data: { aiEnabled: body.enabled }
+      });
       res.json(conversation);
     })
   );
@@ -237,7 +389,8 @@ export function createAdminRouter(deps: AdminRouterDeps) {
         where: { id: conversation.id },
         data: {
           handoffStatus: 'ACTIVE',
-          lastMessageAt: new Date()
+          lastMessageAt: new Date(),
+          unreadCount: 0
         }
       });
 
@@ -275,6 +428,72 @@ export function createAdminRouter(deps: AdminRouterDeps) {
       });
 
       res.json({ data: suggestions });
+    })
+  );
+
+  router.get(
+    '/admin/settings',
+    asyncHandler(async (_req, res) => {
+      const business = await getDefaultBusiness(deps.prisma);
+      const [settings, paymentMethods] = await Promise.all([
+        deps.prisma.adminSetting.findMany({ where: { businessId: business.id } }),
+        deps.prisma.paymentMethod.findMany({
+          where: { businessId: business.id },
+          orderBy: { sortOrder: 'asc' }
+        })
+      ]);
+      res.json({ business, settings, paymentMethods });
+    })
+  );
+
+  router.patch(
+    '/admin/settings',
+    asyncHandler(async (req, res) => {
+      const body = settingsSchema.parse(req.body);
+      const business = await getDefaultBusiness(deps.prisma);
+
+      if (body.businessName) {
+        await deps.prisma.business.update({
+          where: { id: business.id },
+          data: { name: body.businessName }
+        });
+      }
+
+      for (const [key, value] of Object.entries({
+        defaultLanguage: body.defaultLanguage,
+        agentTone: body.agentTone,
+        secureFormUrl: body.secureFormUrl,
+        adminNotificationNumber: body.adminNotificationNumber
+      })) {
+        if (value !== undefined) {
+          await deps.prisma.adminSetting.upsert({
+            where: {
+              businessId_key: {
+                businessId: business.id,
+                key
+              }
+            },
+            create: {
+              businessId: business.id,
+              key,
+              value
+            },
+            update: { value }
+          });
+        }
+      }
+
+      if (body.paymentMethods) {
+        await deps.prisma.paymentMethod.deleteMany({ where: { businessId: business.id } });
+        await deps.prisma.paymentMethod.createMany({
+          data: body.paymentMethods.map((method) => ({
+            businessId: business.id,
+            ...method
+          }))
+        });
+      }
+
+      res.json({ ok: true });
     })
   );
 
@@ -349,7 +568,8 @@ export function createAdminRouter(deps: AdminRouterDeps) {
         handoffs,
         sensitive,
         approvedKnowledge,
-        pendingFaqSuggestions
+        pendingFaqSuggestions,
+        aiReplies
       ] = await Promise.all([
         deps.prisma.contact.count({ where: { businessId: business.id } }),
         deps.prisma.conversation.count({ where: { businessId: business.id } }),
@@ -362,16 +582,39 @@ export function createAdminRouter(deps: AdminRouterDeps) {
         }),
         deps.prisma.faqSuggestion.count({
           where: { businessId: business.id, status: 'PENDING' }
+        }),
+        deps.prisma.message.count({
+          where: {
+            aiGenerated: true,
+            conversation: { businessId: business.id }
+          }
         })
       ]);
 
+      const topIntents = await deps.prisma.message.groupBy({
+        by: ['intent'],
+        where: {
+          intent: { not: null },
+          conversation: { businessId: business.id }
+        },
+        _count: { intent: true },
+        orderBy: { _count: { intent: 'desc' } },
+        take: 10
+      });
+
       res.json({
+        totalConversations: conversations,
         contacts,
         conversations,
+        aiReplies,
         handoffs,
+        humanHandoffs: handoffs,
         sensitive,
         approvedKnowledge,
-        pendingFaqSuggestions
+        unansweredQuestions: pendingFaqSuggestions,
+        pendingFaqSuggestions,
+        topIntents,
+        averageResponseTimeSeconds: null
       });
     })
   );

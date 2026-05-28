@@ -19,7 +19,7 @@ export function shouldHandoff(args: {
     return { required: true, reason: 'customer_requested_admin' };
   }
 
-  if (['complaint', 'refund', 'payment_issue'].includes(args.intent.name)) {
+  if (['complaint', 'refund', 'payment_issue', 'human_handoff'].includes(args.intent.name)) {
     return { required: true, reason: args.intent.name };
   }
 

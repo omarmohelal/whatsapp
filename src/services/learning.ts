@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { AiClient } from './openai';
+import type { AiClient } from './gemini';
 
 export class LearningService {
   constructor(
