@@ -208,7 +208,7 @@ export const INSTAPAY_PAYMENT_REPLIES = [
 export const CREDENTIALS_REPLY =
   'تمام، لأمانك بلاش تبعت أي باسورد في الشات ❤️ لو الطلب محتاج بيانات دخول هحوّلك لأدمن يديك طريقة تسليم آمنة ومؤقتة.';
 
-export const HUMAN_HANDOFF_REPLY = 'تمام ❤️ هحوّلك لأدمن يكمل معاك في أسرع وقت.';
+export const HUMAN_HANDOFF_REPLY = 'تمام ❤️ الأدمن هيراجع معاك ويكمل التفاصيل بأمان.';
 
 export const COMING_SOON_REPLY =
   'الخدمة دي لسه مش متاحة عندنا حاليًا ❤️ لكن هنضيفها قريب جدًا إن شاء الله. لو حابب أقدر أساعدك في Wild Rift أو League أو Valorant.';
@@ -242,7 +242,7 @@ export const UNSURE_REPLY =
   'مش متأكد 100% من المعلومة دي، فهخلي أدمن يراجعها معاك بدل ما أقول حاجة غلط. ممكن توضّح طلبك في سطر واحد؟';
 
 export const AI_FALLBACK_REPLY =
-  'معلش حصلت مشكلة بسيطة، ابعتلي اسم اللعبة والخدمة اللي محتاجها والأدمن هيراجعها ❤️';
+  'ابعتلي اسم اللعبة والخدمة المطلوبة في رسالة واحدة، والأدمن هيراجعها معاك ❤️';
 
 export const GEMINI_MISSING_KEY_REPLY = AI_FALLBACK_REPLY;
 

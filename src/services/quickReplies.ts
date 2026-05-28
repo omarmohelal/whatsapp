@@ -4,12 +4,14 @@ import {
   CREDENTIALS_REPLY,
   HUMAN_HANDOFF_REPLY,
   LEAGUE_SKIN_GIFT_REPLY,
+  ORDER_COMPLETED_REVIEW_REPLY,
   PAYMENT_METHODS_REPLY,
   PAYMENT_PROOF_REPLY,
   PRICE_SKUS,
   RIOT_GIFT_ADD_ACCOUNTS_REPLY,
   WILD_RIFT_CORE_PACKAGES,
-  WILD_RIFT_KEY_TIERS
+  WILD_RIFT_KEY_TIERS,
+  WILD_RIFT_SKIN_PRICES
 } from '../config/constants';
 import { env } from '../config/env';
 import { detectSensitiveCredentials } from './credentials';
@@ -55,42 +57,33 @@ const catalogKeys = {
 } as const;
 
 const gameAliases: Record<Exclude<DetectedGame, 'general' | 'unknown'>, string[]> = {
-  wild_rift: ['وايلد', 'وايلد ريفت', 'wild rift', 'wr'],
-  league: ['league', 'league of legends', 'lol', 'ليج', 'ليج اوف ليجندز', 'rp', 'ار بي'],
-  valorant: ['valorant', 'val', 'فالورانت', 'فال', 'vp']
+  wild_rift: ['وايلد', 'وايلد ريفت', 'وايلدرفت', 'ريفت', 'wild rift', 'wildrift', 'wr'],
+  league: ['league', 'league of legends', 'lol', 'ليج', 'لول', 'ليج اوف ليجندز', 'rp', 'ار بي'],
+  valorant: ['valorant', 'val', 'فالورانت', 'فالورنت', 'فال', 'vp', 'في بي']
 };
 
-const greetingKeywords = [
-  'السلام عليكم',
-  'سلام عليكم',
-  'صباح الخير',
-  'مساء الخير',
-  'هاي',
-  'هلا',
-  'hi',
-  'hello'
-];
-const paymentKeywords = ['طرق الدفع', 'الدفع', 'بدفع ازاي', 'ادفع ازاي', 'احول على ايه', 'payment', 'pay'];
-const paymentProofKeywords = ['تم التحويل', 'حولت', 'دفعت', 'بعتلك', 'بعت لك', 'سكرين دفع', 'وصل؟'];
+const greetingKeywords = ['السلام عليكم', 'سلام عليكم', 'صباح الخير', 'مساء الخير', 'هاي', 'هلا', 'hi', 'hello'];
+const paymentKeywords = ['طرق الدفع', 'طريقه الدفع', 'طريقة الدفع', 'الدفع', 'بدفع ازاي', 'ادفع ازاي', 'احول على ايه', 'payment', 'pay'];
+const paymentProofKeywords = ['تم التحويل', 'حولت', 'دفعت', 'بعتلك سكرين', 'بعت لك سكرين', 'سكرين دفع', 'وصل؟'];
+const orderDoneKeywords = ['وصلت', 'استلمت', 'تم الشحن', 'الشحن وصل', 'وصل يا باشا', 'وصل شكرا'];
 const delayKeywords = ['اتأخر', 'اتأخرت', 'لسه موصلش', 'موصلش', 'فين الطلب', 'فين الشحن', 'تأخير'];
-const priceKeywords = ['اسعار', 'الاسعار', 'سعر', 'بكام', 'كام', 'price', 'prices', 'list', 'menu', 'packages', 'باقات'];
+const priceKeywords = ['اسعار', 'الاسعار', 'أسعار', 'السعر', 'سعر', 'بكام', 'كام', 'price', 'prices', 'list', 'menu', 'packages', 'باقات'];
 const handoffKeywords = ['ادمن', 'أدمن', 'اكلم حد', 'خدمة عملاء', 'refund', 'استرجاع', 'شكوى', 'مشكلة'];
 const accountSellKeywords = ['ابيع اكونت', 'أبيع اكونت', 'اعرض اكونت', 'بيع اكونت', 'sell account', 'list account'];
 const accountBuyKeywords = ['اشتري اكونت', 'عايز اكونت', 'اكونت للبيع', 'buy account', 'account available'];
-const giftKeywords = ['gift', 'جيفت', 'هدية', 'هديه', 'skin', 'skins', 'سكن', 'سكنات'];
+const giftKeywords = ['gift', 'جيفت', 'هدية', 'هديه', 'skin', 'skins', 'سكن', 'سكنات', 'اسكن', 'اسكين'];
 const wildRiftCoreKeywords = ['core', 'cores', 'wild core', 'wild cores', 'كور', 'كورز', 'كورس'];
 const mythicKeywords = ['mythic', 'prestige', 'orange essence', 'orange', 'ميثك', 'برستيج', 'اورنج', 'مفاتيح', 'key', 'keys'];
-const notAddedKeywords = ['مش مضاف', 'مش ضايف', 'ضيفكم', 'اضيف مين', 'add account', 'add accounts'];
-const topUpKeywords = ['شحن', 'اشحن', 'عايز اشحن', 'top up', 'charge'];
+const notAddedKeywords = ['مش مضاف', 'مش ضايف', 'ضيفكم', 'اضيف مين', 'add account', 'add accounts', 'add'];
+const topUpKeywords = ['شحن', 'اشحن', 'هشحن', 'عايز اشحن', 'top up', 'charge'];
+const leagueGiftAskKeywords = ['هشحن جيفت', 'جيفت ليج', 'سكن ليج', 'league gift', 'league skin'];
 
 function hasAny(text: string, keywords: string[]) {
   const normalized = normalizeForIntent(text);
   return keywords.some((keyword) => {
     const needle = normalizeForIntent(keyword);
     if (/^[a-z0-9]{1,3}$/i.test(needle)) {
-      return new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`, 'i').test(
-        normalized
-      );
+      return new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}($|\\s)`, 'i').test(normalized);
     }
     return normalized.includes(needle);
   });
@@ -99,21 +92,14 @@ function hasAny(text: string, keywords: string[]) {
 function detectGame(text: string, mediaCatalog: MediaCatalogEntry[]) {
   const normalized = normalizeForIntent(text);
 
-  for (const [game, aliases] of Object.entries(gameAliases) as Array<
-    [Exclude<DetectedGame, 'general' | 'unknown'>, string[]]
-  >) {
-    if (aliases.some((alias) => normalized.includes(normalizeForIntent(alias)))) {
-      return game;
-    }
+  for (const [game, aliases] of Object.entries(gameAliases) as Array<[Exclude<DetectedGame, 'general' | 'unknown'>, string[]]>) {
+    if (aliases.some((alias) => normalized.includes(normalizeForIntent(alias)))) return game;
   }
 
-  const catalogMatch = mediaCatalog.find((item) =>
-    item.aliases.some((alias) => normalized.includes(normalizeForIntent(alias)))
-  );
+  const catalogMatch = mediaCatalog.find((item) => item.aliases.some((alias) => normalized.includes(normalizeForIntent(alias))));
   if (catalogMatch?.key === 'wild_rift_shipping') return 'wild_rift';
   if (catalogMatch?.key === 'league_rp') return 'league';
   if (catalogMatch?.key === 'valorant_vp') return 'valorant';
-
   return undefined;
 }
 
@@ -127,20 +113,11 @@ function normalizeMemoryGame(value?: string | null): DetectedGame | undefined {
 }
 
 function textResult(args: Omit<QuickReplyResult, 'matched' | 'responseType' | 'priceRequest'> & { priceRequest?: boolean }) {
-  return {
-    matched: true,
-    responseType: 'text' as const,
-    priceRequest: args.priceRequest ?? false,
-    ...args
-  };
+  return { matched: true, responseType: 'text' as const, priceRequest: args.priceRequest ?? false, ...args };
 }
 
 function imageResult(args: Omit<QuickReplyResult, 'matched' | 'responseType'>) {
-  return {
-    matched: true,
-    responseType: 'image' as const,
-    ...args
-  };
+  return { matched: true, responseType: 'image' as const, ...args };
 }
 
 function aiResult(intent = 'general', priceRequest = false): QuickReplyResult {
@@ -148,12 +125,7 @@ function aiResult(intent = 'general', priceRequest = false): QuickReplyResult {
 }
 
 function handoffResult(args: Omit<QuickReplyResult, 'matched' | 'responseType' | 'priceRequest'>) {
-  return {
-    matched: true,
-    responseType: 'handoff' as const,
-    priceRequest: false,
-    ...args
-  };
+  return { matched: true, responseType: 'handoff' as const, priceRequest: false, ...args };
 }
 
 function pendingFields(base: Record<string, unknown> | null | undefined, next: Record<string, unknown>) {
@@ -166,26 +138,48 @@ function imageUrlForGame(game: Exclude<DetectedGame, 'general' | 'unknown'>, med
 }
 
 function priceCaptionForGame(game: Exclude<DetectedGame, 'general' | 'unknown'>) {
-  if (game === 'wild_rift') {
-    return 'دي أسعار Wild Rift ❤️\nاختار الباقة اللي محتاجها وابعتها لنا.';
-  }
-  if (game === 'league') {
-    return 'دي أسعار League RP ❤️\nالـ RP فوري. ابعت السيرفر والباقه المطلوبة.';
-  }
-  return 'دي أسعار Valorant VP ❤️\nابعت الريجون والباقه المطلوبة.';
+  if (game === 'wild_rift') return 'دي أسعار Wild Rift ❤️\nاختار عدد الكورز أو نوع السكن اللي محتاجه وابعتها لي.';
+  if (game === 'league') return 'دي أسعار League RP ❤️\nالـ RP فوري. ابعت السيرفر والباقة المطلوبة.';
+  return 'دي أسعار Valorant VP ❤️\nابعت الريجون والباقة المطلوبة.';
+}
+
+function normalizeDigits(text: string) {
+  const arabic = '٠١٢٣٤٥٦٧٨٩';
+  const persian = '۰۱۲۳۴۵۶۷۸۹';
+  return text.replace(/[٠-٩۰-۹]/g, (char) => {
+    const arabicIndex = arabic.indexOf(char);
+    if (arabicIndex >= 0) return String(arabicIndex);
+    const persianIndex = persian.indexOf(char);
+    return String(persianIndex);
+  });
 }
 
 function detectedNumbers(text: string) {
-  return Array.from(text.matchAll(/\d+/g)).map((match) => Number(match[0])).filter(Boolean);
+  const normalized = normalizeDigits(text.replace(/,/g, ''));
+  const numbers = Array.from(normalized.matchAll(/\d+/g)).map((match) => Number(match[0])).filter(Boolean);
+  if (/10\s*(?:k|الف|الاف|ألف|آلاف|تلاف)/i.test(normalized)) numbers.push(10000);
+  return Array.from(new Set(numbers));
+}
+
+function detectWildRiftCorePackage(text: string) {
+  const normalized = normalizeForIntent(normalizeDigits(text));
+  const numbers = detectedNumbers(text);
+  if (/10\s*(?:k|الف|الاف|ألف|آلاف|تلاف)/i.test(normalized)) numbers.push(10000);
+  return WILD_RIFT_CORE_PACKAGES.find((pack) => numbers.includes(pack.amount));
+}
+
+function detectWildRiftSkinType(text: string) {
+  const normalized = normalizeForIntent(text);
+  return Object.values(WILD_RIFT_SKIN_PRICES).find((skin) =>
+    skin.aliases.some((alias) => normalized.includes(normalizeForIntent(alias)))
+  );
 }
 
 function detectSpecificPrice(text: string, game?: DetectedGame) {
-  const normalized = normalizeForIntent(text);
+  const normalized = normalizeForIntent(normalizeDigits(text));
   const numbers = detectedNumbers(text);
   return PRICE_SKUS.find((sku) => {
-    if (game && game !== 'general' && game !== 'unknown' && sku.game !== game) {
-      return false;
-    }
+    if (game && game !== 'general' && game !== 'unknown' && sku.game !== game) return false;
     const aliasMatch = sku.aliases.some((alias) => normalized.includes(normalizeForIntent(alias)));
     const numberMatch = numbers.includes(sku.amount);
     const unitMatch =
@@ -199,16 +193,17 @@ function detectSpecificPrice(text: string, game?: DetectedGame) {
 function priceReplyText(sku: (typeof PRICE_SKUS)[number]) {
   const region = sku.region ? ` ${sku.region}` : '';
   const usd = sku.usd ? ` / ${sku.usd}` : '';
-  return `تمام ❤️ ${sku.amount} ${sku.unit}${region} سعرها ${sku.egp}${usd}.\nتحب تدفع Instapay ولا Vodafone Cash ولا طريقة تانية؟`;
+  return `تمام ❤️ ${sku.amount} ${sku.unit}${region} سعرها ${sku.egp}${usd}.\nتحب تدفع InstaPay ولا Vodafone Cash؟ ولو طريقة تانية قولّي.`;
+}
+
+function wildRiftCorePriceReply(amount: number, egp: number) {
+  return `تمام ❤️ ${amount} Wild Cores سعرها ${egp} EGP.\nطريقة الدفع إيه؟ InstaPay ولا Vodafone Cash؟\nبعد الدفع ابعت سكرين التحويل + بيانات الأكونت، والأدمن يكمل الشحن بأمان.`;
 }
 
 function wildRiftUnknownCoreReply(text: string) {
-  const number = detectedNumbers(text)[0];
-  if (!number || WILD_RIFT_CORE_PACKAGES.some((pack) => pack.amount === number)) {
-    return undefined;
-  }
-
-  return `مش لاقي باقة ${number} كور في الأسعار المؤكدة عندي ❤️\nاختار باقة من صورة الأسعار أو أسيبها للأدمن يراجع السعر بدل ما أديك رقم غلط.`;
+  const number = detectedNumbers(text).sort((a, b) => b - a)[0];
+  if (!number || WILD_RIFT_CORE_PACKAGES.some((pack) => pack.amount === number)) return undefined;
+  return `مش لاقي باقة ${number} كور في الأسعار المؤكدة عندي ❤️\nابعتلي صورة الأسعار اللي معاك أو اختار باقة من الصورة، والأدمن يراجع لو محتاج كمية خاصة.`;
 }
 
 function mythicOrangeReply(text: string) {
@@ -217,22 +212,23 @@ function mythicOrangeReply(text: string) {
     const current = Math.min(numbers[0], numbers[1]);
     const required = Math.max(numbers[0], numbers[1]);
     const missing = required - current;
-    if (missing <= 0) {
-      return 'تمام ❤️ كده غالبًا معاك Orange Essence كفاية. ابعتلي اسم السكن المطلوب وصورته والأدمن يراجعلك التفاصيل.';
-    }
+    if (missing <= 0) return 'تمام ❤️ كده غالبًا معاك Orange Essence كفاية. ابعت اسم السكن المطلوب وصورته ونأكد التفاصيل قبل التنفيذ.';
     const tier = WILD_RIFT_KEY_TIERS.find((item) => missing >= item.min && missing <= item.max);
-    if (!tier) {
-      return 'محتاج أتأكد من السعر الحالي للكميات دي، هخلي الأدمن يراجعها لك بدل ما أديك رقم غلط.';
-    }
-    return `ناقصك تقريبًا ${missing} Orange Essence ❤️\nحسب سعر المفاتيح الحالي الإجمالي حوالي ${Math.round(missing * tier.pricePerKey)} EGP.\nابعت اسم السكن المطلوب والأدمن يراجع التفاصيل قبل التنفيذ.`;
+    if (!tier) return 'الكمية دي محتاجة مراجعة سعر من الأدمن عشان الخصم حسب العدد ❤️ ابعت اسم السكن وعدد الـ Orange الناقص.';
+    return `ناقصك حوالي ${missing} Orange Essence ❤️\nحسب سعر المفاتيح الحالي التكلفة تقريبًا ${Math.round(missing * tier.pricePerKey)} EGP.\nلو هتشتري كمية أكبر ممكن يبقى فيه خصم، ابعت اسم السكن والأدمن يأكد السعر النهائي.`;
   }
-
-  return 'معاك كام Orange Essence حاليًا؟ واسم السكن المطلوب إيه؟';
+  return 'تمام ❤️ الميثك/البرستيج بيتحسب بالـ Orange Essence والمفاتيح. معاك كام Orange حاليًا؟ واسم السكن المطلوب إيه؟';
 }
 
 function hasOrderDetails(memory: ConversationMemory) {
   const pending = memory.pendingFields ?? {};
   return Boolean(pending.game && (pending.package || pending.product || pending.service));
+}
+
+function isLikelyPaymentProof(text: string, memory: ConversationMemory) {
+  if (hasAny(text, paymentProofKeywords)) return true;
+  if (!hasOrderDetails(memory)) return false;
+  return /^(تم|خلصت|دفعت|حولت|بعت)$/i.test(normalizeForIntent(text));
 }
 
 export function detectQuickReply(
@@ -243,43 +239,37 @@ export function detectQuickReply(
 ): QuickReplyResult {
   const normalizedText = text.trim();
   const memoryGame = normalizeMemoryGame(memory.detectedGame);
-  const game = detectGame(text, mediaCatalog) ?? memoryGame;
+  const explicitGame = detectGame(text, mediaCatalog);
+  const game = explicitGame ?? memoryGame;
   const priceRequest = hasAny(text, priceKeywords);
   const sensitive = detectSensitiveCredentials(text);
+  const hasCoreIntent = hasAny(text, wildRiftCoreKeywords);
+  const hasGiftIntent = hasAny(text, giftKeywords) || hasAny(text, leagueGiftAskKeywords);
+  const hasTopUpIntent = hasAny(text, topUpKeywords);
 
   if (sensitive.isSensitive) {
-    return handoffResult({
-      text: CREDENTIALS_REPLY,
-      intent: 'credentials',
-      needsHuman: true,
-      sensitive: true,
-      handoffReason: 'sensitive_credentials'
-    });
+    return handoffResult({ text: CREDENTIALS_REPLY, intent: 'credentials', needsHuman: true, sensitive: true, handoffReason: 'sensitive_credentials' });
   }
 
   if (hasAny(text, handoffKeywords)) {
-    return handoffResult({
-      text: HUMAN_HANDOFF_REPLY,
-      intent: 'human_handoff',
-      needsHuman: true,
-      handoffReason: 'human_requested'
+    return handoffResult({ text: HUMAN_HANDOFF_REPLY, intent: 'human_handoff', needsHuman: true, handoffReason: 'human_requested' });
+  }
+
+  if (hasAny(text, orderDoneKeywords)) {
+    return textResult({
+      text: ORDER_COMPLETED_REVIEW_REPLY,
+      intent: 'order_completed_review',
+      pendingFields: pendingFields(memory.pendingFields, { orderCompletedReviewSent: true })
     });
   }
 
   if (hasAny(text, delayKeywords)) {
-    return handoffResult({
-      text: 'حقك علينا ❤️ ابعتلي رقم الطلب أو سكرين الدفع واسم اللعبة، والأدمن هيراجع حالة الطلب فورًا.',
-      intent: 'delivery_delay',
-      needsHuman: true,
-      handoffReason: 'delivery_delay'
-    });
+    return handoffResult({ text: 'حقك علينا ❤️ ابعتلي رقم الطلب أو سكرين الدفع واسم اللعبة، والأدمن هيراجع حالة الطلب فورًا.', intent: 'delivery_delay', needsHuman: true, handoffReason: 'delivery_delay' });
   }
 
-  if (options.type === 'image' || hasAny(text, paymentProofKeywords)) {
+  if (options.type === 'image' || isLikelyPaymentProof(text, memory)) {
     return textResult({
-      text: hasOrderDetails(memory)
-        ? 'تمام، كده الطلب جاهز للمراجعة. الأدمن هيأكد الدفع ويبدأ التنفيذ ❤️'
-        : PAYMENT_PROOF_REPLY,
+      text: hasOrderDetails(memory) ? 'تمام وصلني ❤️ الأدمن هيراجع الدفع ويبدأ تنفيذ الطلب. لو لسه ما بعتش بيانات الأكونت/الـ ID ابعتها دلوقتي.' : PAYMENT_PROOF_REPLY,
       intent: 'payment_proof',
       game,
       needsHuman: true,
@@ -289,100 +279,85 @@ export function detectQuickReply(
 
   if (normalizedText && hasAny(text, greetingKeywords)) {
     return textResult({
-      text: 'وعليكم السلام ورحمة الله ❤️ أهلاً بيك في The Nexus، ابعتلي اسم اللعبة أو الخدمة اللي محتاجها وأنا أظبطهالك.',
+      text: 'وعليكم السلام ورحمة الله ❤️ أهلاً بيك في The Nexus. ابعت طلبك براحتك: اسم اللعبة + اللي محتاجه، ولو معاك باقة معينة اكتبها مباشرة.',
       intent: 'greeting'
     });
   }
 
   if (hasAny(text, paymentKeywords) || hasAny(text, ['فودافون', 'انستا باي', 'instapay', 'vodafone'])) {
-    return textResult({
-      text: PAYMENT_METHODS_REPLY,
-      intent: 'payment_methods',
-      game,
-      lastAskedQuestion: 'payment_method',
-      pendingFields: pendingFields(memory.pendingFields, { awaitingPaymentMethod: true })
-    });
+    return textResult({ text: PAYMENT_METHODS_REPLY, intent: 'payment_methods', game, lastAskedQuestion: 'payment_method', pendingFields: pendingFields(memory.pendingFields, { awaitingPaymentMethod: true }) });
   }
 
   if (hasAny(text, accountSellKeywords)) {
-    return textResult({
-      text: ACCOUNT_LISTING_REPLY,
-      intent: 'account_sell',
-      lastAskedQuestion: 'account_form'
-    });
+    return textResult({ text: ACCOUNT_LISTING_REPLY, intent: 'account_sell', lastAskedQuestion: 'account_form' });
   }
 
   if (hasAny(text, accountBuyKeywords)) {
-    return textResult({
-      text: ACCOUNT_BUYING_REPLY,
-      intent: 'account_buy',
-      lastAskedQuestion: 'account_preferences'
-    });
+    return textResult({ text: ACCOUNT_BUYING_REPLY, intent: 'account_buy', lastAskedQuestion: 'account_preferences' });
   }
 
   if (hasAny(text, mythicKeywords)) {
+    return textResult({ text: mythicOrangeReply(text), intent: 'mythic_orange_keys', game: game ?? 'wild_rift', lastAskedQuestion: 'orange_amount', pendingFields: pendingFields(memory.pendingFields, { game: 'wild_rift', product: 'mythic_orange_keys' }) });
+  }
+
+  const wrPack = (game === 'wild_rift' || !explicitGame) && hasCoreIntent ? detectWildRiftCorePackage(text) : undefined;
+  if (wrPack) {
     return textResult({
-      text: mythicOrangeReply(text),
-      intent: 'mythic_orange_keys',
-      game: game ?? 'wild_rift',
-      lastAskedQuestion: 'orange_amount',
-      pendingFields: pendingFields(memory.pendingFields, { product: 'mythic_orange_keys' })
+      text: wildRiftCorePriceReply(wrPack.amount, wrPack.egp),
+      intent: 'specific_price',
+      game: 'wild_rift',
+      priceRequest: true,
+      lastAskedQuestion: 'payment_method',
+      pendingFields: pendingFields(memory.pendingFields, { game: 'wild_rift', product: 'Wild Cores', package: `${wrPack.amount} WC`, total: `${wrPack.egp} EGP` })
+    });
+  }
+
+  const wrSkin = (game === 'wild_rift' || !explicitGame) && hasGiftIntent ? detectWildRiftSkinType(text) : undefined;
+  if (wrSkin && (game === 'wild_rift' || hasAny(text, ['وايلد', 'wild']))) {
+    return textResult({
+      text: `تمام ❤️ ${wrSkin.label} في Wild Rift سعره ${wrSkin.egp} EGP.\nابعت اسم السكن والـ ID، ولو الأكونت مش مضاف عندنا قولّي عشان أبعتلك أكونتات الإضافة.`,
+      intent: 'wild_rift_skin_price',
+      game: 'wild_rift',
+      priceRequest: true,
+      pendingFields: pendingFields(memory.pendingFields, { game: 'wild_rift', product: wrSkin.label, total: `${wrSkin.egp} EGP` })
     });
   }
 
   const sku = detectSpecificPrice(text, game);
-  if (sku && (priceRequest || hasAny(text, wildRiftCoreKeywords))) {
+  if (sku && (priceRequest || hasCoreIntent || hasGiftIntent || hasTopUpIntent)) {
     return textResult({
       text: priceReplyText(sku),
       intent: 'specific_price',
       game: sku.game,
       priceRequest: true,
       lastAskedQuestion: 'payment_method',
-      pendingFields: pendingFields(memory.pendingFields, {
-        game: sku.game,
-        product: sku.product,
-        package: `${sku.amount} ${sku.unit}`,
-        total: sku.egp
-      })
+      pendingFields: pendingFields(memory.pendingFields, { game: sku.game, product: sku.product, package: `${sku.amount} ${sku.unit}`, total: sku.egp })
     });
   }
 
-  if ((game === 'wild_rift' || !game) && hasAny(text, wildRiftCoreKeywords)) {
+  if ((game === 'wild_rift' || memoryGame === 'wild_rift') && hasCoreIntent) {
     const unknownCoreText = wildRiftUnknownCoreReply(text);
     if (unknownCoreText) {
-      return textResult({
-        text: unknownCoreText,
-        intent: 'unknown_price',
-        game: 'wild_rift',
-        needsHuman: true,
-        handoffReason: 'pricing_uncertainty'
-      });
+      return textResult({ text: unknownCoreText, intent: 'unknown_price', game: 'wild_rift', needsHuman: true, handoffReason: 'pricing_uncertainty' });
     }
+    return textResult({
+      text: 'تمام ❤️ Wild Rift Cores. ابعت عدد الكورز المطلوب من صورة الأسعار، أو اكتب “أسعار وايلد ريفت” لو عايز الصورة تاني.',
+      intent: 'wild_rift_cores_intake',
+      game: 'wild_rift',
+      pendingFields: pendingFields(memory.pendingFields, { game: 'wild_rift', product: 'Wild Cores' })
+    });
   }
 
   if (game && game !== 'general' && game !== 'unknown' && priceRequest) {
-    return imageResult({
-      imageUrl: imageUrlForGame(game, mediaCatalog),
-      caption: priceCaptionForGame(game),
-      intent: game === 'league' ? 'league_rp_prices' : `${game}_prices`,
-      game,
-      priceRequest,
-      lastAskedQuestion: game === 'wild_rift' ? 'package' : 'region_and_package',
-      pendingFields: pendingFields(memory.pendingFields, { game })
-    });
+    return imageResult({ imageUrl: imageUrlForGame(game, mediaCatalog), caption: priceCaptionForGame(game), intent: game === 'league' ? 'league_rp_prices' : `${game}_prices`, game, priceRequest, lastAskedQuestion: game === 'wild_rift' ? 'package' : 'region_and_package', pendingFields: pendingFields(memory.pendingFields, { game }) });
   }
 
-  if (game === 'wild_rift' && hasAny(text, giftKeywords)) {
+  if (game === 'wild_rift' && hasGiftIntent) {
     if (hasAny(text, notAddedKeywords) && !memory.pendingFields?.riotGiftAccountsSent) {
-      return textResult({
-        text: RIOT_GIFT_ADD_ACCOUNTS_REPLY,
-        intent: 'wild_rift_gift_accounts',
-        game: 'wild_rift',
-        pendingFields: pendingFields(memory.pendingFields, { riotGiftAccountsSent: true })
-      });
+      return textResult({ text: RIOT_GIFT_ADD_ACCOUNTS_REPLY, intent: 'wild_rift_gift_accounts', game: 'wild_rift', pendingFields: pendingFields(memory.pendingFields, { game: 'wild_rift', product: 'gift_or_skin', riotGiftAccountsSent: true }) });
     }
     return textResult({
-      text: 'تمام ❤️ ابعتلي اسم السكن، الـ ID، وهل الأكونت مضاف عندنا ولا لأ؟',
+      text: 'تمام ❤️ ابعت اسم السكن أو صورته + الـ ID. ولو السكن Gift ومحتاج تضيفنا، قولّي “ابعت أكونتات الإضافة”.',
       intent: 'wild_rift_gift',
       game: 'wild_rift',
       lastAskedQuestion: 'wild_rift_gift_details',
@@ -390,49 +365,23 @@ export function detectQuickReply(
     });
   }
 
-  if (game === 'league' && hasAny(text, giftKeywords)) {
-    return textResult({
-      text: LEAGUE_SKIN_GIFT_REPLY,
-      intent: 'league_skin_gift',
-      game: 'league',
-      lastAskedQuestion: 'league_gift_details',
-      pendingFields: pendingFields(memory.pendingFields, { game: 'league', product: 'skin_or_gift' })
-    });
+  if (game === 'league' && hasGiftIntent) {
+    return textResult({ text: LEAGUE_SKIN_GIFT_REPLY, intent: 'league_skin_gift', game: 'league', lastAskedQuestion: 'league_gift_details', pendingFields: pendingFields(memory.pendingFields, { game: 'league', product: 'skin_or_gift' }) });
   }
 
-  if (game === 'wild_rift' && !priceRequest) {
-    return textResult({
-      text: 'تمام ❤️ Wild Rift. محتاج Cores ولا Skin/Gift ولا أكونت؟',
-      intent: 'wild_rift_intake',
-      game: 'wild_rift',
-      lastAskedQuestion: 'wild_rift_service',
-      pendingFields: pendingFields(memory.pendingFields, { game: 'wild_rift' })
-    });
+  if (game === 'wild_rift' && hasTopUpIntent) {
+    return imageResult({ imageUrl: imageUrlForGame('wild_rift', mediaCatalog), caption: priceCaptionForGame('wild_rift'), intent: 'wild_rift_prices', game: 'wild_rift', priceRequest: true, pendingFields: pendingFields(memory.pendingFields, { game: 'wild_rift' }) });
   }
 
   if (game === 'league' && !priceRequest) {
-    return textResult({
-      text: 'تمام ❤️ League. محتاج RP ولا Skin/Gift؟',
-      intent: 'league_intake',
-      game: 'league',
-      lastAskedQuestion: 'league_service',
-      pendingFields: pendingFields(memory.pendingFields, { game: 'league' })
-    });
+    return textResult({ text: 'تمام ❤️ League PC. لو RP فهو فوري، ولو Skin/Gift ابعت اسم السكن وRiot ID والسيرفر، وبعد الإضافة بننتظر 7 أيام حسب Riot.', intent: 'league_intake', game: 'league', lastAskedQuestion: 'league_service', pendingFields: pendingFields(memory.pendingFields, { game: 'league' }) });
   }
 
   if (game === 'valorant' && !priceRequest) {
-    return textResult({
-      text: 'تمام ❤️ Valorant. ابعتلي الريجون والباقه المطلوبة للـ VP.',
-      intent: 'valorant_intake',
-      game: 'valorant',
-      lastAskedQuestion: 'region_and_package',
-      pendingFields: pendingFields(memory.pendingFields, { game: 'valorant' })
-    });
+    return textResult({ text: 'تمام ❤️ Valorant VP. ابعت الريجون والباقة المطلوبة، أو اكتب “أسعار فالورانت” لو عايز الصورة.', intent: 'valorant_intake', game: 'valorant', lastAskedQuestion: 'region_and_package', pendingFields: pendingFields(memory.pendingFields, { game: 'valorant' }) });
   }
 
-  if (hasAny(text, topUpKeywords)) {
-    return aiResult('top_up', priceRequest);
-  }
+  if (hasTopUpIntent) return aiResult('top_up', priceRequest);
 
   return aiResult('general', priceRequest);
 }
