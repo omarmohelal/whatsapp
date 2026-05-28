@@ -14,4 +14,6 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npm run migrate && npm run start"]
+RUN npm run build
+
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/index.js"]
