@@ -63,6 +63,38 @@ export const WILD_RIFT_PACKAGE_CONFIRMATION = (packageName: string) =>
 export const VODAFONE_PAYMENT_REPLY =
   'تمام ❤️ فودافون كاش على الرقم:\n01007208978\nبعد التحويل ابعتلنا سكرين التحويل.';
 
+export const GAME_DISPLAY_NAMES = {
+  wild_rift: 'Wild Rift',
+  league: 'League RP',
+  valorant: 'Valorant VP',
+  general: 'اللعبة',
+  unknown: 'اللعبة'
+} as const;
+
+export const PACKAGE_PAYMENT_PROMPT = (packageName: string, gameName: string) =>
+  `تمام ❤️ باقة ${packageName} لـ ${gameName}.\nتحب تدفع بإيه؟`;
+
+export const VALORANT_REGION_AFTER_PACKAGE_REPLY =
+  'تمام ❤️ ابعتلي الريجون عشان نكمل طلب Valorant.';
+
+export const LEAGUE_SERVER_AFTER_PACKAGE_REPLY =
+  'تمام ❤️ ابعتلي السيرفر عشان نكمل طلب الـ RP.';
+
+export const PRICE_LIST_NEEDS_GAME_REPLY =
+  'تمام ❤️ ابعتلي اسم اللعبة الأول عشان أبعتهالك.';
+
+export const ASK_PACKAGE_AGAIN_REPLY =
+  'تمام ❤️ ابعتلي الباقة اللي محتاجها.';
+
+export const INSTANT_PAYMENT_REPLIES = {
+  vodafone_cash: 'تمام ❤️ فودافون كاش على الرقم:\n01007208978\nبعد التحويل ابعتلنا سكرين التحويل.',
+  instapay: 'تمام ❤️ InstaPay على الرقم:\n01014094664\nبعد الدفع ابعتلنا سكرين التحويل.',
+  paypal: 'تمام ❤️ PayPal متاح. ابعتلنا الإيميل أو اطلب من الأدمن لينك الدفع.',
+  payoneer: 'تمام ❤️ Payoneer متاح. الأدمن هيبعتلك بيانات الدفع المناسبة.',
+  binance: 'تمام ❤️ Crypto / Binance متاح. الأدمن هيبعتلك بيانات التحويل حسب العملة اللي هتدفع بيها.',
+  card: 'تمام ❤️ الدفع بالكارت متاح. الأدمن هيبعتلك لينك الدفع المناسب.'
+} as const;
+
 export const CREDENTIALS_REPLY =
   'تمام، لأمانك بلاش تبعت الباسورد هنا لو مش ضروري ❤️\nلو الطلب محتاج بيانات دخول، الأدمن هيكمل معاك أو ابعت البيانات من الفورم الآمن:\nhttps://www.thenexus.ink/';
 

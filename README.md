@@ -29,6 +29,24 @@ npm run worker:dev
 npm run dashboard:dev
 ```
 
+
+## Smart Agent Behavior
+
+The bot now uses a hybrid flow instead of fixed autoresponses:
+
+1. Detects intent, game, price-list requests, payment method, credentials, and handoff requests.
+2. Uses conversation memory (`detected_game`, `last_asked_question`, and `pending_fields`) so follow-up messages like `٥ دولار`, `ابعت الباقة`, or `فودافون` are understood in context.
+3. Sends catalog images only when the customer clearly asks for prices or packages. Mentioning `وايلد ريفت` alone asks for the package instead of sending an image.
+4. Uses Gemini only when deterministic business logic cannot answer naturally.
+5. Learns safely from chat by storing recent messages as context and creating FAQ suggestions from unanswered questions or admin replies. Suggestions must be approved in the dashboard before becoming official knowledge.
+
+Important flow rules:
+
+- Wild Rift never needs region; ask for package only.
+- Valorant needs region and package.
+- League RP needs server and package.
+- Never invent prices or stock. Use media catalog images or ask a clarifying question.
+
 ## Required Env Vars
 
 - `DATABASE_URL`

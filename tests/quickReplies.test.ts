@@ -208,4 +208,63 @@ describe('hybrid deterministic WhatsApp routing', () => {
     expect(reply.needsHuman).toBe(true);
     expect(reply.intent).toBe('human_handoff');
   });
+
+
+  it('uses memory to treat Arabic digit dollar package as Wild Rift package', () => {
+    const reply = detectQuickReply('٥ دولار', catalog, {
+      detectedGame: 'wild_rift',
+      lastIntent: 'top_up',
+      lastAskedQuestion: 'package',
+      pendingFields: { game: 'wild_rift', package: null }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      game: 'wild_rift',
+      lastAskedQuestion: 'payment_method'
+    });
+    expect(reply.text).toContain('5 دولار');
+    expect(reply.text).toContain('تحب تدفع');
+  });
+
+  it('uses memory to send Wild Rift image when customer says ابعت الباقة', () => {
+    const reply = detectQuickReply('ابعت الباقة', catalog, {
+      detectedGame: 'wild_rift',
+      lastIntent: 'top_up',
+      lastAskedQuestion: 'package',
+      pendingFields: { game: 'wild_rift', package: null }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'image',
+      game: 'wild_rift',
+      priceRequest: true
+    });
+    expect(reply.imageUrl).toContain('wrc.png');
+  });
+
+  it('asks for game when customer asks for a package list without context', () => {
+    const reply = detectQuickReply('ابعت الباقة', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'price_list_needs_game'
+    });
+    expect(reply.text).toContain('اسم اللعبة');
+  });
+
+  it('detects misspelled Wild Rift aliases', () => {
+    const reply = detectQuickReply('وايلدرفت', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      game: 'wild_rift',
+      lastAskedQuestion: 'package'
+    });
+  });
+
 });
