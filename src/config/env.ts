@@ -27,7 +27,7 @@ const envSchema = z.object({
   MESSENGER_PAGE_ACCESS_TOKEN: z.string().optional().default(''),
   META_APP_SECRET: z.string().optional().default(''),
   GEMINI_API_KEY: z.string().optional().default(isTest ? 'test-gemini-key' : ''),
-  GEMINI_CHAT_MODEL: z.string().default('gemini-1.5-flash'),
+  GEMINI_CHAT_MODEL: z.string().default('gemini-2.0-flash'),
   GEMINI_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
   ENCRYPTION_KEY: z.string().min(16).default(isTest ? 'test-encryption-key-that-is-long-enough' : ''),
   SENSITIVE_DATA_TTL_DAYS: z.coerce.number().int().positive().default(7),

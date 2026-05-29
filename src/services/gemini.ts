@@ -32,12 +32,21 @@ function normalizeEmbedding(values: number[], size = DEFAULT_EMBEDDING_SIZE): nu
   return [...values, ...Array.from({ length: size - values.length }, () => 0)];
 }
 
+function uniq(values: string[]) {
+  return values.map((value) => value.trim()).filter(Boolean).filter((value, index, array) => array.indexOf(value) === index);
+}
+
 function messagesToGeminiText(messages: ChatMessage[]): string {
   return messages.map((message) => `${message.role.toUpperCase()}:\n${message.content}`).join('\n\n');
 }
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isNotFoundModelError(error: unknown) {
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  return /404|not found|not supported|not available/i.test(text);
 }
 
 export class GeminiService implements AiClient {
@@ -47,8 +56,9 @@ export class GeminiService implements AiClient {
     private readonly env: Env,
     private readonly logger?: Pick<AppLogger, 'warn' | 'error' | 'info'>
   ) {
-    if (process.env.GEMINI_API_KEY || env.GEMINI_API_KEY) {
-      this.client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || env.GEMINI_API_KEY);
+    const apiKey = process.env.GEMINI_API_KEY || env.GEMINI_API_KEY;
+    if (apiKey) {
+      this.client = new GoogleGenerativeAI(apiKey);
     }
   }
 
@@ -72,11 +82,32 @@ export class GeminiService implements AiClient {
       return [];
     }
 
-    return this.withRetry('gemini_embedding', async () => {
-      const model = client.getGenerativeModel({ model: this.env.GEMINI_EMBEDDING_MODEL });
-      const result = await model.embedContent(input);
-      return normalizeEmbedding(result.embedding.values ?? []);
-    });
+    const candidates = uniq([
+      this.env.GEMINI_EMBEDDING_MODEL,
+      process.env.GEMINI_EMBEDDING_MODEL || '',
+      'text-embedding-004',
+      'gemini-embedding-001',
+      'embedding-001'
+    ]);
+
+    for (const modelName of candidates) {
+      try {
+        return await this.withRetry('gemini_embedding', async () => {
+          const model = client.getGenerativeModel({ model: modelName });
+          const result = await model.embedContent(input);
+          return normalizeEmbedding(result.embedding.values ?? []);
+        });
+      } catch (error) {
+        this.logger?.warn({ err: error, modelName }, 'Gemini embedding model failed');
+        if (!isNotFoundModelError(error)) {
+          break;
+        }
+      }
+    }
+
+    // Knowledge search is helpful but must never stop the bot from replying.
+    this.logger?.warn('All Gemini embedding models failed; continuing without RAG context');
+    return [];
   }
 
   async createChatCompletion(messages: ChatMessage[]): Promise<string> {
@@ -86,23 +117,44 @@ export class GeminiService implements AiClient {
       return GEMINI_MISSING_KEY_REPLY;
     }
 
-    try {
-      return await this.withRetry('gemini_chat', async () => {
-        const model = client.getGenerativeModel({
-          model: this.env.GEMINI_CHAT_MODEL,
-          generationConfig: {
-            temperature: 0.55,
-            topP: 0.9,
-            maxOutputTokens: 520
-          }
+    const candidates = uniq([
+      this.env.GEMINI_CHAT_MODEL,
+      process.env.GEMINI_CHAT_MODEL || '',
+      'gemini-2.0-flash',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-flash'
+    ]);
+
+    for (const modelName of candidates) {
+      try {
+        const reply = await this.withRetry('gemini_chat', async () => {
+          const model = client.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+              temperature: 0.55,
+              topP: 0.9,
+              maxOutputTokens: 520
+            }
+          });
+          const result = await model.generateContent(messagesToGeminiText(messages));
+          return result.response.text().trim();
         });
-        const result = await model.generateContent(messagesToGeminiText(messages));
-        return result.response.text().trim();
-      });
-    } catch (error) {
-      this.logger?.error({ err: error }, 'Gemini chat failed; returning safe fallback');
-      return AI_FALLBACK_REPLY;
+
+        if (modelName !== this.env.GEMINI_CHAT_MODEL) {
+          this.logger?.warn({ modelName }, 'Gemini chat succeeded using fallback model');
+        }
+        return reply;
+      } catch (error) {
+        this.logger?.warn({ err: error, modelName }, 'Gemini chat model failed');
+        if (!isNotFoundModelError(error)) {
+          break;
+        }
+      }
     }
+
+    this.logger?.error('All Gemini chat models failed; returning safe fallback');
+    return AI_FALLBACK_REPLY;
   }
 
   private async withRetry<T>(operation: string, fn: () => Promise<T>): Promise<T> {
