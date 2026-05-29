@@ -62,21 +62,24 @@ const gameAliases: Record<Exclude<DetectedGame, 'general' | 'unknown'>, string[]
   valorant: ['valorant', 'val', 'فالورانت', 'فالورنت', 'فال', 'vp', 'في بي']
 };
 
-const greetingKeywords = ['السلام عليكم', 'سلام عليكم', 'صباح الخير', 'مساء الخير', 'هاي', 'هلا', 'hi', 'hello'];
+const greetingKeywords = ['السلام عليكم', 'سلام عليكم', 'سلامو', 'سلام', 'صباح الخير', 'صباحو', 'مساء الخير', 'هاي', 'هلا', 'hi', 'hello', 'ازيك', 'عامل ايه'];
 const paymentKeywords = ['طرق الدفع', 'طريقه الدفع', 'طريقة الدفع', 'الدفع', 'بدفع ازاي', 'ادفع ازاي', 'احول على ايه', 'payment', 'pay'];
-const paymentProofKeywords = ['تم التحويل', 'حولت', 'دفعت', 'بعتلك سكرين', 'بعت لك سكرين', 'سكرين دفع', 'وصل؟'];
+const paymentProofKeywords = ['تم التحويل', 'حولت', 'دفعت', 'بعتلك سكرين', 'بعت لك سكرين', 'سكرين دفع', 'وصل؟', 'وصل الدفع', 'ادي السكرين', 'ابعتلك السكرين'];
 const orderDoneKeywords = ['وصلت', 'استلمت', 'تم الشحن', 'الشحن وصل', 'وصل يا باشا', 'وصل شكرا'];
 const delayKeywords = ['اتأخر', 'اتأخرت', 'لسه موصلش', 'موصلش', 'فين الطلب', 'فين الشحن', 'تأخير'];
 const priceKeywords = ['اسعار', 'الاسعار', 'أسعار', 'السعر', 'سعر', 'بكام', 'كام', 'price', 'prices', 'list', 'menu', 'packages', 'باقات'];
 const handoffKeywords = ['ادمن', 'أدمن', 'اكلم حد', 'خدمة عملاء', 'refund', 'استرجاع', 'شكوى', 'مشكلة'];
 const accountSellKeywords = ['ابيع اكونت', 'أبيع اكونت', 'اعرض اكونت', 'بيع اكونت', 'sell account', 'list account'];
 const accountBuyKeywords = ['اشتري اكونت', 'عايز اكونت', 'اكونت للبيع', 'buy account', 'account available'];
-const giftKeywords = ['gift', 'جيفت', 'هدية', 'هديه', 'skin', 'skins', 'سكن', 'سكنات', 'اسكن', 'اسكين'];
-const wildRiftCoreKeywords = ['core', 'cores', 'wild core', 'wild cores', 'كور', 'كورز', 'كورس'];
+const giftKeywords = ['gift', 'جيفت', 'جفت', 'هدية', 'هديه', 'skin', 'skins', 'سكن', 'سكنات', 'اسكن', 'اسكين', 'سكنه', 'سكين'];
+const wildRiftCoreKeywords = ['core', 'cores', 'wild core', 'wild cores', 'كور', 'كورز', 'كورس', 'كوريز', 'ويلد كور'];
 const mythicKeywords = ['mythic', 'prestige', 'orange essence', 'orange', 'ميثك', 'برستيج', 'اورنج', 'مفاتيح', 'key', 'keys'];
 const notAddedKeywords = ['مش مضاف', 'مش ضايف', 'ضيفكم', 'اضيف مين', 'add account', 'add accounts', 'add'];
-const topUpKeywords = ['شحن', 'اشحن', 'هشحن', 'عايز اشحن', 'top up', 'charge'];
+const topUpKeywords = ['شحن', 'اشحن', 'هشحن', 'عايز اشحن', 'عاوز اشحن', 'محتاج اشحن', 'اشتري', 'عايز اشتري', 'top up', 'charge'];
 const leagueGiftAskKeywords = ['هشحن جيفت', 'جيفت ليج', 'سكن ليج', 'league gift', 'league skin'];
+const explainGiftKeywords = ['مش فاهم', 'مش فاهمه', 'مش واضح', 'افهم', 'فهمني', 'ايه الاسكن الهديه', 'يعني ايه gift', 'يعني ايه جيفت', 'ازاي الجيفت', 'الهديه دي ايه'];
+const confusionKeywords = ['مش عارف', 'مش فاهم', 'مش واضح', 'اعمل اي', 'ادوس فين', 'ازاي', 'اي المطلوب', 'يعني ايه', 'فهمني', 'وضحلي', 'مش فاهمك'];
+const unsupportedOrNoiseKeywords = ['كلام مش عارف', 'مش عايز ادوس', 'مش عارف يدوس'];
 
 function hasAny(text: string, keywords: string[]) {
   const normalized = normalizeForIntent(text);
@@ -138,7 +141,7 @@ function imageUrlForGame(game: Exclude<DetectedGame, 'general' | 'unknown'>, med
 }
 
 function priceCaptionForGame(game: Exclude<DetectedGame, 'general' | 'unknown'>) {
-  if (game === 'wild_rift') return 'دي أسعار Wild Rift ❤️\nاختار عدد الكورز أو نوع السكن اللي محتاجه وابعتها لي.';
+  if (game === 'wild_rift') return 'دي أسعار Wild Rift ❤️\nلو هتشحن كورز ابعت العدد بس، ولو سكن ابعت اسم السكن أو صورته.';
   if (game === 'league') return 'دي أسعار League RP ❤️\nالـ RP فوري. ابعت السيرفر والباقة المطلوبة.';
   return 'دي أسعار Valorant VP ❤️\nابعت الريجون والباقة المطلوبة.';
 }
@@ -159,6 +162,37 @@ function detectedNumbers(text: string) {
   const numbers = Array.from(normalized.matchAll(/\d+/g)).map((match) => Number(match[0])).filter(Boolean);
   if (/10\s*(?:k|الف|الاف|ألف|آلاف|تلاف)/i.test(normalized)) numbers.push(10000);
   return Array.from(new Set(numbers));
+}
+
+
+function isBareGameOnly(text: string) {
+  const normalized = normalizeForIntent(text);
+  const withoutGameWords = normalized
+    .replace(/wild rift|wildrift|وايلد ريفت|وايلدرفت|وايلد|wr|league of legends|league|ليج اوف ليجندز|ليج|lol|لول|valorant|فالورانت|فالورنت|فال|val|vp/gi, '')
+    .replace(/\s+/g, '')
+    .trim();
+  return withoutGameWords.length === 0;
+}
+
+function isBarePriceNudge(text: string) {
+  const normalized = normalizeForIntent(text);
+  return ['الاسعار', 'اسعار', 'السعر', 'سعر', 'بكام', 'كام', 'price', 'prices'].includes(normalized);
+}
+
+function isAskingForGiftAccounts(text: string) {
+  return hasAny(text, notAddedKeywords) || hasAny(text, ['ابعت اكونتات الاضافه', 'ابعت الاكونتات', 'اضيف مين', 'اضيفكم ازاي', 'هات الاكونتات']);
+}
+
+function isCustomerSayingAdded(text: string) {
+  return hasAny(text, ['ضيفت', 'ضفت', 'عملت add', 'بعت ادد', 'بعت add', 'قبلت', 'تمت الاضافه', 'اتقبلت', 'مضاف']);
+}
+
+function hasWildRiftGiftContext(memory: ConversationMemory, pending: Record<string, unknown>) {
+  return memory.detectedGame === 'wild_rift' || pending.game === 'wild_rift' || memory.lastAskedQuestion === 'wild_rift_gift_details' || pending.product === 'gift_or_skin';
+}
+
+function hasLeagueGiftContext(memory: ConversationMemory, pending: Record<string, unknown>) {
+  return memory.detectedGame === 'league' || pending.game === 'league' || memory.lastAskedQuestion === 'league_gift_details' || pending.product === 'skin_or_gift';
 }
 
 function detectWildRiftCorePackage(text: string) {
@@ -197,7 +231,7 @@ function priceReplyText(sku: (typeof PRICE_SKUS)[number]) {
 }
 
 function wildRiftCorePriceReply(amount: number, egp: number) {
-  return `تمام ❤️ ${amount} Wild Cores سعرها ${egp} EGP.\nطريقة الدفع إيه؟ InstaPay ولا Vodafone Cash؟\nبعد الدفع ابعت سكرين التحويل + بيانات الأكونت، والأدمن يكمل الشحن بأمان.`;
+  return `تمام ❤️ ${amount} Wild Cores سعرها ${egp} EGP.\nاختار طريقة الدفع: InstaPay ولا Vodafone Cash؟\nبعد التحويل ابعت سكرين الدفع، وبعدها هنحتاج بيانات الأكونت بشكل آمن لإتمام الشحن.`;
 }
 
 function wildRiftUnknownCoreReply(text: string) {
@@ -206,18 +240,171 @@ function wildRiftUnknownCoreReply(text: string) {
   return `مش لاقي باقة ${number} كور في الأسعار المؤكدة عندي ❤️\nابعتلي صورة الأسعار اللي معاك أو اختار باقة من الصورة، والأدمن يراجع لو محتاج كمية خاصة.`;
 }
 
+function getKeyTierPrice(missing: number) {
+  return WILD_RIFT_KEY_TIERS.find((item) => missing >= item.min && missing <= item.max);
+}
+
+function orangeCostText(missing: number) {
+  if (missing <= 0) return 'كده غالبًا معاك Orange كفاية ❤️ ابعت اسم السكن أو صورته ونأكد التنفيذ.';
+  const tier = getKeyTierPrice(missing);
+  if (!tier) return `ناقصك ${missing} Orange تقريبًا ❤️ الكمية دي ممكن يدخلها خصم كميات، فالأدمن يأكد السعر النهائي قبل الدفع.`;
+  return `ناقصك ${missing} Orange تقريبًا ❤️ تكلفتهم حوالي ${Math.round(missing * tier.pricePerKey)} EGP على سعر المفاتيح الحالي.`;
+}
+
+function extractOrangeIntentNumber(text: string) {
+  return detectedNumbers(text).sort((a, b) => b - a)[0];
+}
+
+function isOrangeContext(memory: ConversationMemory, pending: Record<string, unknown>) {
+  return memory.lastAskedQuestion === 'orange_amount' || pending.product === 'mythic_orange_keys' || memory.lastIntent === 'mythic_orange_keys';
+}
+
+function classifyOrangeNumber(text: string, pending: Record<string, unknown>) {
+  const normalized = normalizeForIntent(text);
+  const amount = extractOrangeIntentNumber(text);
+  if (!amount) return { amount: undefined, kind: undefined as undefined | 'current' | 'required' };
+
+  const saysCurrent = hasAny(normalized, ['معايا', 'معي', 'عندي', 'معاك', 'عندك', 'رصيدي', 'اورنج معايا']);
+  const saysRequired = hasAny(normalized, ['محتاج', 'عايز', 'تكلف', 'يتطلب', 'لازم', 'الاسكن ب', 'السكن ب', 'بيحتاج']);
+  if (saysCurrent) return { amount, kind: 'current' as const };
+  if (saysRequired) return { amount, kind: 'required' as const };
+
+  if (typeof pending.orangeCurrent === 'number' && typeof pending.orangeRequired !== 'number') {
+    return { amount, kind: 'required' as const };
+  }
+  if (typeof pending.orangeRequired === 'number' && typeof pending.orangeCurrent !== 'number') {
+    return { amount, kind: 'current' as const };
+  }
+  return { amount, kind: 'current' as const };
+}
+
+function orangeFlowReply(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const { amount, kind } = classifyOrangeNumber(text, pending);
+  const next = pendingFields(pending, { game: 'wild_rift', product: 'mythic_orange_keys' });
+
+  if (amount && kind === 'current') next.orangeCurrent = amount;
+  if (amount && kind === 'required') next.orangeRequired = amount;
+
+  const current = typeof next.orangeCurrent === 'number' ? next.orangeCurrent : undefined;
+  const required = typeof next.orangeRequired === 'number' ? next.orangeRequired : undefined;
+
+  if (current !== undefined && required !== undefined) {
+    const missing = Math.max(0, required - current);
+    return {
+      text: `${orangeCostText(missing)}\nابعت اسم السكن أو صورته، ولو تمام اختار طريقة الدفع: InstaPay ولا Vodafone Cash؟`,
+      pendingFields: pendingFields(next, {
+        orangeMissing: missing,
+        awaitingPaymentMethod: true,
+        product: 'mythic_orange_keys'
+      }),
+      lastAskedQuestion: 'payment_method'
+    };
+  }
+
+  if (current !== undefined) {
+    return {
+      text: `تمام ❤️ معاك ${current} Orange. السكن محتاج كام Orange إجماليًا؟ ابعت الرقم بس وأنا أحسبلك الناقص والسعر.`,
+      pendingFields: next,
+      lastAskedQuestion: 'orange_amount'
+    };
+  }
+
+  if (required !== undefined) {
+    return {
+      text: `تمام ❤️ السكن محتاج ${required} Orange. معاك كام Orange حاليًا؟ ابعت الرقم بس وأنا أحسبلك الناقص والسعر.`,
+      pendingFields: next,
+      lastAskedQuestion: 'orange_amount'
+    };
+  }
+
+  return {
+    text: 'تمام ❤️ عشان أحسب الميثك صح ابعتلي حاجتين: معاك كام Orange حاليًا؟ والسكن محتاج كام Orange إجماليًا؟',
+    pendingFields: next,
+    lastAskedQuestion: 'orange_amount'
+  };
+}
+
 function mythicOrangeReply(text: string) {
   const numbers = detectedNumbers(text);
   if (numbers.length >= 2) {
     const current = Math.min(numbers[0], numbers[1]);
     const required = Math.max(numbers[0], numbers[1]);
     const missing = required - current;
-    if (missing <= 0) return 'تمام ❤️ كده غالبًا معاك Orange Essence كفاية. ابعت اسم السكن المطلوب وصورته ونأكد التفاصيل قبل التنفيذ.';
-    const tier = WILD_RIFT_KEY_TIERS.find((item) => missing >= item.min && missing <= item.max);
-    if (!tier) return 'الكمية دي محتاجة مراجعة سعر من الأدمن عشان الخصم حسب العدد ❤️ ابعت اسم السكن وعدد الـ Orange الناقص.';
-    return `ناقصك حوالي ${missing} Orange Essence ❤️\nحسب سعر المفاتيح الحالي التكلفة تقريبًا ${Math.round(missing * tier.pricePerKey)} EGP.\nلو هتشتري كمية أكبر ممكن يبقى فيه خصم، ابعت اسم السكن والأدمن يأكد السعر النهائي.`;
+    return `${orangeCostText(missing)}\nابعت اسم السكن أو صورته، ولو تمام اختار طريقة الدفع: InstaPay ولا Vodafone Cash؟`;
   }
-  return 'تمام ❤️ الميثك/البرستيج بيتحسب بالـ Orange Essence والمفاتيح. معاك كام Orange حاليًا؟ واسم السكن المطلوب إيه؟';
+  if (numbers.length === 1) {
+    return `تمام ❤️ معاك ${numbers[0]} Orange. ابعت اسم السكن أو صورة المطلوب وقولي هو محتاج كام Orange إجماليًا، وأنا أحسب لك الناقص والسعر.`;
+  }
+  return 'تمام ❤️ الميثك/البرستيج بيتحسب بالـ Orange Essence والمفاتيح. ابعت اسم السكن أو صورته + معاك كام Orange حاليًا؟';
+}
+
+function pendingHelpReply(memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+
+  const asked = memory.lastAskedQuestion;
+  const game = normalizeMemoryGame(String(pending.game ?? memory.detectedGame ?? ''));
+
+  if (asked === 'league_gift_details' || pending.product === 'skin_or_gift') {
+    return 'ولا يهمك ❤️ لو ده League Skin/Gift المطلوب منك بس: Riot ID + السيرفر + اسم السكن أو صورته.\nبعد ما تضيفنا كصديق، الهدية بتتبعت بعد 7 أيام حسب نظام Riot.';
+  }
+  if (asked === 'wild_rift_gift_details' || pending.product === 'gift_or_skin') {
+    return 'ولا يهمك ❤️ لو السكن Gift في Wild Rift ابعت اسم السكن أو صورته + الـ ID.\nلو محتاج تضيفنا اكتب: ابعت أكونتات الإضافة، ولو السكن من الشحن العادي ابعت اسم السكن بس.';
+  }
+  if (asked === 'payment_method' || pending.awaitingPaymentMethod) {
+    return 'تمام ❤️ المطلوب دلوقتي تختار طريقة الدفع بس: InstaPay ولا Vodafone Cash؟\nلو هتدفع Crypto / PayPal / كارت، الأدمن هيبعتلك التفاصيل.';
+  }
+  if (asked === 'payment_proof' || pending.awaitingPaymentProof) {
+    return 'المطلوب بعد التحويل تبعت سكرين الدفع + تفاصيل الطلب في رسالة واحدة ❤️\nمثال: Wild Rift - 10000 كور - ID/Username.';
+  }
+  if (game === 'wild_rift') {
+    return 'ولا يهمك ❤️ ابعتلي بالظبط عايز إيه في Wild Rift: عدد الكورز، أو اسم السكن/صورة السكن. لو عايز الأسعار اكتب: أسعار وايلد ريفت.';
+  }
+  if (game === 'league') {
+    return 'ولا يهمك ❤️ في League: لو RP ابعت السيرفر والباقه، ولو Skin/Gift ابعت Riot ID + السيرفر + اسم السكن.';
+  }
+  return undefined;
+}
+
+function isGenericConfusion(text: string) {
+  return hasAny(text, confusionKeywords) || hasAny(text, unsupportedOrNoiseKeywords);
+}
+
+function isGiftExplanationRequest(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const giftContext = Boolean(memory.lastIntent?.includes('gift') || String(pending.product ?? '').includes('gift'));
+  const mentionsGift = hasAny(text, ['gift', 'جيفت', 'جفت', 'هديه', 'هدية', 'اسكن هديه', 'سكن هديه', 'skin gift']);
+  const asksToExplain = hasAny(text, ['مش فاهم', 'مش واضح', 'افهم', 'فهمني', 'يعني ايه', 'ازاي']);
+  return (mentionsGift && asksToExplain) || (giftContext && asksToExplain);
+}
+
+function imageContextReply(memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const game = normalizeMemoryGame(String(pending.game ?? memory.detectedGame ?? ''));
+  if (pending.awaitingPaymentProof || memory.lastAskedQuestion === 'payment_proof') {
+    return {
+      text: 'وصلت صورة الدفع ❤️ هراجعها حالًا. ابعت في رسالة واحدة: اسم اللعبة + الباقة/السكن + الـ ID أو اليوزر المطلوب للشحن.',
+      intent: 'payment_proof_image',
+      needsHuman: true,
+      handoffReason: 'payment_review'
+    };
+  }
+  if (memory.lastAskedQuestion === 'skin_name_or_id' || memory.lastAskedQuestion === 'wild_rift_gift_details' || pending.product === 'gift_or_skin') {
+    return {
+      text: 'وصلت صورة السكن ❤️ ابعتلي اسم اللعبة + الـ ID/Username، وقولي هتدفع InstaPay ولا Vodafone Cash عشان أحسبها ونكمل.',
+      intent: 'skin_image_received'
+    };
+  }
+  if (game) {
+    return {
+      text: `وصلت الصورة ❤️ لو دي خاصة بـ ${game === 'wild_rift' ? 'Wild Rift' : game === 'league' ? 'League' : 'Valorant'} ابعت المطلوب في سطر واحد: سعر؟ شحن؟ مشكلة؟ عشان أرد عليك من غير لخبطة.`,
+      intent: 'context_image_received'
+    };
+  }
+  return {
+    text: 'وصلت الصورة ❤️ محتاج أعرف المطلوب منها: تسعير، شحن، سكن، ولا مشكلة في طلب؟',
+    intent: 'unknown_image_received'
+  };
 }
 
 function hasOrderDetails(memory: ConversationMemory) {
@@ -248,6 +435,28 @@ export function detectQuickReply(
   const hasTopUpIntent = hasAny(text, topUpKeywords);
   const pending = memory.pendingFields ?? {};
 
+  // If customer gives the next missing detail, keep moving instead of reopening the menu.
+  if (isCustomerSayingAdded(text) && (hasWildRiftGiftContext(memory, pending) || hasLeagueGiftContext(memory, pending))) {
+    return textResult({
+      text: hasLeagueGiftContext(memory, pending)
+        ? 'تمام ❤️ كده ناقصني Riot ID + السيرفر + اسم السكن/الجيفت، وبعد 7 أيام من قبول الإضافة نقدر نبعت الهدية حسب نظام Riot.'
+        : 'تمام ❤️ كده ناقصني اسم السكن أو صورته + الـ ID، وقولي طريقة الدفع عشان نكمل الطلب.',
+      intent: 'gift_added_followup',
+      game: hasLeagueGiftContext(memory, pending) ? 'league' : 'wild_rift',
+      lastAskedQuestion: hasLeagueGiftContext(memory, pending) ? 'league_gift_details' : 'wild_rift_gift_details',
+      pendingFields: pendingFields(pending, { giftAccountAdded: true })
+    });
+  }
+
+  if (isAskingForGiftAccounts(text) && (hasWildRiftGiftContext(memory, pending) || hasLeagueGiftContext(memory, pending))) {
+    return textResult({
+      text: RIOT_GIFT_ADD_ACCOUNTS_REPLY,
+      intent: hasLeagueGiftContext(memory, pending) ? 'league_gift_accounts' : 'wild_rift_gift_accounts',
+      game: hasLeagueGiftContext(memory, pending) ? 'league' : 'wild_rift',
+      pendingFields: pendingFields(pending, { riotGiftAccountsSent: true })
+    });
+  }
+
   if (sensitive.isSensitive) {
     return handoffResult({
       text: CREDENTIALS_REPLY,
@@ -267,6 +476,29 @@ export function detectQuickReply(
     });
   }
 
+  if (isGiftExplanationRequest(text, memory)) {
+    return textResult({
+      text: game === 'league' || memory.detectedGame === 'league'
+        ? 'تمام ❤️ الـ Gift في League يعني السكن بيتبعت هدية من أكونت عندنا لأكونتك. المطلوب: Riot ID + السيرفر + اسم السكن. بعد ما تضيفنا صديق ونقبلك، Riot بتفرض انتظار 7 أيام قبل إرسال الهدية.'
+        : 'تمام ❤️ الـ Gift/Skin يعني السكن بيتبعت لك على أكونتك عن طريق أكونتات TheNexus أو حسب طريقة اللعبة. ابعت اسم السكن أو صورته + الـ ID، ولو محتاج تضيفنا اكتب “ابعت أكونتات الإضافة”.',
+      intent: 'gift_explanation',
+      game: game ?? memoryGame,
+      pendingFields: pendingFields(pending, { product: 'gift_or_skin' })
+    });
+  }
+
+  if (isGenericConfusion(text)) {
+    const help = pendingHelpReply(memory);
+    if (help) {
+      return textResult({
+        text: help,
+        intent: 'context_help',
+        game: game ?? memoryGame,
+        pendingFields: pending
+      });
+    }
+  }
+
   if (hasAny(text, orderDoneKeywords)) {
     return textResult({
       text: ORDER_COMPLETED_REVIEW_REPLY,
@@ -284,7 +516,16 @@ export function detectQuickReply(
     });
   }
 
-  if (options.type === 'image' || isLikelyPaymentProof(text, memory)) {
+  if (options.type === 'image' && !normalizedText) {
+    const imageReply = imageContextReply(memory);
+    return textResult({
+      ...imageReply,
+      game,
+      pendingFields: pendingFields(pending, { imageReceived: true })
+    });
+  }
+
+  if (isLikelyPaymentProof(text, memory)) {
     return textResult({
       text: hasOrderDetails(memory)
         ? 'وصل الدفع يا فندم ❤️ هراجعه حالًا. لو لسه ما بعتش بيانات التنفيذ ابعت الـ ID/اليوزر واسم الباقة في رسالة واحدة.'
@@ -337,7 +578,21 @@ export function detectQuickReply(
     });
   }
 
-  // Exact Wild Rift core amount. This must win even if the customer did not repeat "Wild Rift".
+  // Orange / Mythic context must win before any numeric Wild Cores parsing.
+  // Example: customer says "معايا 700 اورنج" then "1000"; the second number means required Orange, not 1000 Wild Cores.
+  if (hasAny(text, mythicKeywords) || isOrangeContext(memory, pending)) {
+    const orange = orangeFlowReply(text, memory);
+    return textResult({
+      text: orange.text,
+      intent: 'mythic_orange_keys',
+      game: 'wild_rift',
+      lastAskedQuestion: orange.lastAskedQuestion,
+      pendingFields: orange.pendingFields
+    });
+  }
+
+  // Exact Wild Rift core amount. This must win even if the customer did not repeat "Wild Rift",
+  // but only outside Orange/Mythic flows.
   const expectsWildRiftCores =
     game === 'wild_rift' ||
     memoryGame === 'wild_rift' ||
@@ -363,17 +618,6 @@ export function detectQuickReply(
         total: `${wrPack.egp} EGP`,
         awaitingPaymentMethod: true
       })
-    });
-  }
-
-  // Mythic / Orange Essence calculator.
-  if (hasAny(text, mythicKeywords)) {
-    return textResult({
-      text: mythicOrangeReply(text),
-      intent: 'mythic_orange_keys',
-      game: game ?? 'wild_rift',
-      lastAskedQuestion: 'orange_amount',
-      pendingFields: pendingFields(pending, { game: 'wild_rift', product: 'mythic_orange_keys' })
     });
   }
 
@@ -409,6 +653,20 @@ export function detectQuickReply(
 
   // Price lists / images only on explicit price request.
   if (game && game !== 'general' && game !== 'unknown' && priceRequest) {
+    if (pending.shownPriceImage && pending.game === game) {
+      return textResult({
+        text: game === 'wild_rift'
+          ? 'الصورة فوق يا فندم ❤️ ابعت عدد الكورز أو نوع السكن اللي محتاجه وأنا أحسبها لك فورًا.'
+          : game === 'league'
+            ? 'الصورة فوق يا فندم ❤️ ابعت السيرفر والباقه، ولو Skin/Gift ابعت Riot ID + السيرفر + اسم السكن.'
+            : 'الصورة فوق يا فندم ❤️ ابعت الريجون والباقه المطلوبة ونكمل.',
+        intent: 'price_image_already_sent',
+        game,
+        priceRequest,
+        lastAskedQuestion: game === 'wild_rift' ? 'package' : 'region_and_package',
+        pendingFields: pending
+      });
+    }
     return imageResult({
       imageUrl: imageUrlForGame(game, mediaCatalog),
       caption: priceCaptionForGame(game),
@@ -484,8 +742,18 @@ export function detectQuickReply(
 
   if (game === 'wild_rift' && hasTopUpIntent) {
     return textResult({
-      text: 'تمام ❤️ وايلد ريفت. هتشحن كورز ولا سكن/جيفت؟ لو عارف العدد أو اسم السكن ابعته مباشرة وأنا أحسبهولك.',
+      text: 'تمام ❤️ Wild Rift. ابعت عدد الكورز لو شحن، أو اسم/صورة السكن لو Gift/Skin، وأنا أحسبها لك مباشرة.',
       intent: 'wild_rift_intake',
+      game: 'wild_rift',
+      lastAskedQuestion: 'wild_rift_service',
+      pendingFields: pendingFields(pending, { game: 'wild_rift' })
+    });
+  }
+
+  if (game === 'wild_rift' && isBareGameOnly(text)) {
+    return textResult({
+      text: 'Wild Rift تمام ❤️ محتاج كورز ولا سكن/جيفت؟ ابعت العدد أو اسم السكن مباشرة.',
+      intent: 'wild_rift_game_only',
       game: 'wild_rift',
       lastAskedQuestion: 'wild_rift_service',
       pendingFields: pendingFields(pending, { game: 'wild_rift' })
@@ -509,6 +777,15 @@ export function detectQuickReply(
       game: 'valorant',
       lastAskedQuestion: 'region_and_package',
       pendingFields: pendingFields(pending, { game: 'valorant' })
+    });
+  }
+
+  if (priceRequest && !game && !memoryGame) {
+    return textResult({
+      text: 'أسعار أي لعبة يا فندم؟ ❤️ ابعت اسم اللعبة بس، ولو Wild Rift / League / Valorant هبعتلك الأسعار فورًا.',
+      intent: 'price_game_missing',
+      lastAskedQuestion: 'game_for_prices',
+      pendingFields: pendingFields(pending, { awaitingGameForPrices: true })
     });
   }
 

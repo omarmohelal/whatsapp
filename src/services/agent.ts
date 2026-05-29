@@ -48,18 +48,18 @@ interface ConversationContext {
 }
 
 const SYSTEM_PROMPT = `You are TheNexus senior sales closer and support agent.
-You are not a menu bot. You speak like a sharp Egyptian human admin in a premium gaming store.
+You are not a menu bot and not a scripted FAQ. You speak like a sharp Egyptian human admin in a premium gaming store, with real context awareness.
 Your output must feel written specifically for the customer's last message and conversation history.
 
 Core behavior:
 - Reply in warm Egyptian Arabic, short but useful. One or two small paragraphs max unless the customer needs steps.
-- No robotic menus, no repeated boilerplate, no "تحب أساعدك في 1/2/3/4".
+- No robotic menus, no numbered service menus, no repeated boilerplate, no "تحب أساعدك في 1/2/3/4".
 - Do not ask questions already answered in the conversation.
 - If the user chose a game/service/package, move forward to the next single step.
-- Ask ONE missing detail at a time. Never stack five questions.
-- If the customer message is just an acknowledgement (تمام/اوكي/ماشي) and there is no pending question, do not add new sales text.
-- If the message is unclear/sticker/emoji, ask for clarification once only, then stay quiet until the customer gives text.
-- Do not claim a human admin will reply unless payment proof, complaint, sensitive login, refund, or pricing uncertainty requires it.
+- Ask ONE missing detail at a time. Never stack five questions. If the customer already gave an amount/item, do not ask what service they want again; continue to price/payment/order details.
+- If the customer message is just an acknowledgement (تمام/اوكي/ماشي) and there is no pending question, stay silent. If there is a pending question, answer only the next logical step.
+- If the message is unclear/sticker/emoji/noise, ask for clarification once only, then stay quiet until the customer gives useful text. Do not improvise sales offers from noise.
+- Do not claim a human admin will reply unless payment proof, complaint, sensitive login, refund, or pricing uncertainty requires it. For normal sales, continue the conversation yourself.
 - Never say "حصلت مشكلة" unless there is a real operational error.
 - Never say you are AI/Gemini/bot/model.
 
@@ -67,10 +67,10 @@ Sales flow:
 - Prices: only give exact known prices from approved knowledge. If unknown, say you will confirm rather than invent.
 - If customer asks for a price image/list, it may be sent by deterministic handler; after that continue conversationally.
 - Wild Rift Cores: if amount is known, give exact price and ask payment method. Never ask "كورز ولا سكن" after they said cores/كورز/amount.
-- Wild Rift skin/gift: ask for skin name or screenshot + ID. Send TheNexus gift accounts only if customer asks how to add or says not added.
+- Wild Rift skin/gift: ask for skin name or screenshot + ID. Send TheNexus gift accounts only if customer asks how to add, says not added, or explicitly needs gift accounts. Never send add accounts for Wild Rift cores.
 - League RP: instant. Ask server and package only if missing.
 - League skin/gift: ask Riot ID + server + skin name. Tell them gift arrives after 7 days from friend add.
-- Mythic/Prestige/Orange: compute missing orange if customer gave current and required amounts; otherwise ask how much orange they have and which skin.
+- Mythic/Prestige/Orange: if the conversation is about Orange Essence, every bare number from the customer is Orange amount, never Wild Cores. Compute missing orange if current and required are known; otherwise ask for the single missing orange number.
 - Account buying: ask for desired game, budget, rank/badges/skins; do not claim stock.
 - Account selling: use thenexus.ink form, ask for clean details, screenshots, FE/OE status, and remind about security.
 - Payment: if customer says InstaPay/Vodafone/Crypto/PayPal, answer with that method details or say admin sends private details for non-local methods.
@@ -79,8 +79,10 @@ Sales flow:
 Style examples:
 Customer: "10 تلاف كور" after Wild Rift context
 Assistant: "تمام ❤️ 10000 Wild Cores سعرها 4935 EGP. هتدفع InstaPay ولا Vodafone Cash؟ بعد التحويل ابعت السكرين ونكمل الشحن."
-Customer: "عايز اسكن ميثك ومعايا 200 اورنج"
-Assistant: "حلو ❤️ ابعت اسم السكن أو صورته وقولي هو محتاج كام Orange بالظبط. لو محتاج 1000 مثلًا يبقى ناقصك 800 ونحسبها على سعر المفاتيح."
+Customer: "عايز اسكن ميثك ومعايا 700 اورنج"
+Assistant: "تمام ❤️ معاك 700 Orange. السكن محتاج كام Orange إجماليًا؟ ابعت الرقم بس وأنا أحسبلك الناقص والسعر."
+Customer: "1000"
+Assistant: "ناقصك 300 Orange تقريبًا ❤️ تكلفتهم حوالي 1605 EGP على سعر المفاتيح الحالي. ابعت اسم السكن أو صورته، ولو تمام اختار طريقة الدفع: InstaPay ولا Vodafone Cash؟"
 Customer: "هشحن جيفت ليج"
 Assistant: "تمام ❤️ ابعت Riot ID + السيرفر + اسم السكن/الجيفت. هدية League بتحتاج إضافة صديق وبعد القبول بنستنى 7 أيام حسب نظام Riot."
 
@@ -92,7 +94,7 @@ const BUSINESS_RULES_CONTEXT = `Approved TheNexus business rules and exact knowl
 - After payment: customer must send payment screenshot/transaction proof + order details. If proof arrives, acknowledge and hand off/review.
 - Wild Rift core prices: 425=275 EGP, 1000=575 EGP, 1850=1040 EGP, 3275=1765 EGP, 4800=2520 EGP, 10000=4935 EGP.
 - Wild Rift skin/pass prices: Legendary Skin=515 EGP, Epic Skin=385 EGP, Rare Skin=285 EGP, Common Skin=205 EGP, Premium Pass=535 EGP, Elite Pass=385 EGP, Normal Pass=160 EGP, Elite Mini Pass=220 EGP, Mini Pass=150 EGP.
-- Wild Rift Mythic/Prestige uses Orange Essence via keys. Key tiers: 1-299 keys at 5.8 EGP/key, 300-500 at 5.35 EGP/key, 501-1000 at 5.145 EGP/key. If customer needs more than 1000 keys, ask admin to confirm bulk discount.
+- Wild Rift Mythic/Prestige uses Orange Essence via keys. In an Orange/Prestige/Mythic conversation, bare numbers mean Orange amount, not Wild Cores. Key tiers: 1-299 keys at 5.8 EGP/key, 300-500 at 5.35 EGP/key, 501-1000 at 5.145 EGP/key. If customer needs more than 1000 keys, ask admin to confirm bulk discount.
 - Wild Rift does not need region. Do not ask for region for Wild Rift.
 - League RP is instant. League skins/gifts require Riot ID + server + item name and 7 days after friend add.
 - League gift accounts should be sent only when customer needs to add TheNexus, not for Wild Rift cores.
@@ -489,7 +491,9 @@ export class AgentService {
       return args.memory.pendingFields?.unclearReplySent ? 'unclear_repeated' : 'unclear_reply_once';
     }
 
-    if (isShortAck(args.text) && !hasClearIntent(args.text, args.input.type)) {
+    const inOpenFlow = Boolean(args.memory.lastAskedQuestion || args.memory.pendingFields?.awaitingPaymentMethod || args.memory.pendingFields?.awaitingPaymentProof);
+
+    if (isShortAck(args.text) && !hasClearIntent(args.text, args.input.type) && !inOpenFlow) {
       return 'short_ack_no_followup';
     }
 
@@ -497,7 +501,8 @@ export class AgentService {
     const clearIntent = hasClearIntent(args.text, args.input.type) || args.quickReply.matched;
     if (
       isWithinCooldown(lastOutbound?.createdAt, args.settings.cooldownSeconds) &&
-      !clearIntent
+      !clearIntent &&
+      !inOpenFlow
     ) {
       return 'conversation_cooldown';
     }
@@ -570,10 +575,20 @@ export class AgentService {
 
   private shouldHumanizeQuickReply(quickReply: QuickReplyResult) {
     if (quickReply.needsHuman || quickReply.sensitive) return false;
-    if (['specific_price', 'payment_methods', 'payment_instapay', 'payment_vodafone', 'payment_proof', 'credentials', 'order_completed_review'].includes(quickReply.intent)) {
-      return false;
-    }
-    return ['wild_rift_intake', 'wild_rift_gift', 'league_intake', 'league_skin_gift', 'valorant_intake', 'account_sell', 'account_buy'].includes(quickReply.intent);
+    // Keep exact money/payment/security messages deterministic so numbers never drift.
+    const lockedIntents = [
+      'specific_price',
+      'payment_methods',
+      'payment_instapay',
+      'payment_vodafone',
+      'payment_external',
+      'payment_proof',
+      'credentials',
+      'order_completed_review'
+    ];
+    if (lockedIntents.includes(quickReply.intent)) return false;
+    // Everything else can be rewritten by Gemini to avoid template-looking replies.
+    return Boolean(quickReply.text);
   }
 
   private async maybeHumanizeQuickReply(ctx: ConversationContext, quickReply: QuickReplyResult, customerText: string) {
@@ -751,7 +766,40 @@ ${text}`;
       return;
     }
 
-    await this.sendAndStoreText(ctx, response, { intent: 'rag' });
+    const polishedResponse = this.polishAiResponse(response, text, memory);
+    await this.sendAndStoreText(ctx, polishedResponse, { intent: 'rag' });
+  }
+
+  private polishAiResponse(response: string, customerText: string, memory: ConversationMemory) {
+    let reply = response.trim();
+    const normalizedCustomer = customerText.replace(/[,،]/g, '').toLowerCase();
+
+    // Never let the AI fall back into old robotic menus or internal-error style messages.
+    if (/تحب أساعدك في|1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|اختار من القائمة/i.test(reply)) {
+      reply = 'تمام ❤️ ابعت اسم اللعبة والخدمة اللي محتاجها بالظبط، ولو عارف الباقة أو السكن اكتبهولي وأنا أكملك خطوة واحدة ورا التانية.';
+    }
+
+    if (/حصلت مشكلة|مشكلة بسيطة|الأدمن هيراجعها/i.test(reply) && !/مشكلة|شكوى|اتاخر|متاخر|دفعت|حولت/i.test(customerText)) {
+      reply = 'محتاج بس توضيح صغير ❤️ ابعت اسم اللعبة + المطلوب بالظبط، ولو عندك صورة أو اسم السكن ابعته وأنا أرد عليك صح.';
+    }
+
+    const pending = memory.pendingFields ?? {};
+    const isWildRiftContext = memory.detectedGame === 'wild_rift' || pending.game === 'wild_rift';
+    if (isWildRiftContext && /كور|cores|core/.test(normalizedCustomer) && /كورز ولا سكن|سكن ولا كورز|cores ولا/i.test(reply)) {
+      if (/10\s*(k|الف|الاف|ألف|آلاف|تلاف)|10000/.test(normalizedCustomer)) {
+        return `تمام ❤️ 10000 Wild Cores سعرها 4935 EGP.
+اختار طريقة الدفع: InstaPay ولا Vodafone Cash؟ وبعد التحويل ابعت سكرين الدفع ونكمل الشحن.`;
+      }
+      return 'تمام ❤️ ابعت عدد الـ Wild Cores اللي محتاجه وأنا أحسبهالك فورًا.';
+    }
+
+    if (reply.length > 1200) {
+      reply = reply.slice(0, 1100).trim() + `
+
+لو تحب أكمل باقي التفاصيل ابعتلي "كمل" ❤️`;
+    }
+
+    return reply;
   }
 
   private async getRecentMessages(conversationId: string, take: number): Promise<ChatMessage[]> {

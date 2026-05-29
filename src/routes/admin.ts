@@ -62,7 +62,7 @@ const settingsSchema = z.object({
   agentTone: z.string().optional(),
   aiEnabled: z.boolean().optional(),
   autoReplyEnabled: z.boolean().optional(),
-  cooldownSeconds: z.number().int().min(20).max(40).optional(),
+  cooldownSeconds: z.number().int().min(5).max(40).optional(),
   maxMessagesContext: z.number().int().min(4).max(20).optional(),
   businessTonePrompt: z.string().optional(),
   gamesServicesKnowledge: z.string().optional(),

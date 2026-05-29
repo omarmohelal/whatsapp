@@ -6,6 +6,8 @@ export const UNCLEAR_MESSAGE_REPLY =
 const shortAckSet = new Set(
   [
     'تمام',
+    'تم',
+    'اوك',
     'اوكي',
     'أوكي',
     'ok',
@@ -62,7 +64,18 @@ const clearIntentKeywords = [
   'mythic',
   'prestige',
   'orange',
-  'مفاتيح'
+  'مفاتيح',
+  'id',
+  'ايدي',
+  'يوزر',
+  'سيرفر',
+  'server',
+  'اورنج',
+  'اورانج',
+  'orange',
+  'كور',
+  'كورز',
+  'cores'
 ];
 
 const emojiPattern = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u;
@@ -120,14 +133,15 @@ export function repliesAreSimilar(a?: string | null, b?: string | null) {
     return true;
   }
 
-  const leftTokens = new Set(left.split(' ').filter((token) => token.length > 2));
-  const rightTokens = new Set(right.split(' ').filter((token) => token.length > 2));
+  const leftTokens = new Set(left.split(' ').filter((token) => token.length >= 2));
+  const rightTokens = new Set(right.split(' ').filter((token) => token.length >= 2));
   if (!leftTokens.size || !rightTokens.size) {
     return false;
   }
 
   const shared = [...leftTokens].filter((token) => rightTokens.has(token)).length;
-  const overlap = shared / Math.min(leftTokens.size, rightTokens.size);
+  const union = leftTokens.size + rightTokens.size - shared;
+  const overlap = union === 0 ? 0 : shared / union;
   return overlap >= 0.82;
 }
 

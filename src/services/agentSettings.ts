@@ -17,7 +17,7 @@ export interface AgentSettings {
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   aiEnabled: true,
   autoReplyEnabled: true,
-  cooldownSeconds: 30,
+  cooldownSeconds: 10,
   maxMessagesContext: 10,
   businessTonePrompt:
     'رد بالمصري، مختصر، محترم، ودود ومناسب للمبيعات. اسأل سؤال واحد بس لما تحتاج توضيح.',
@@ -56,7 +56,7 @@ export async function loadAgentSettings(
   return {
     aiEnabled: boolValue(map.get('aiEnabled'), DEFAULT_AGENT_SETTINGS.aiEnabled),
     autoReplyEnabled: boolValue(map.get('autoReplyEnabled'), DEFAULT_AGENT_SETTINGS.autoReplyEnabled),
-    cooldownSeconds: numberValue(map.get('cooldownSeconds'), DEFAULT_AGENT_SETTINGS.cooldownSeconds, 20, 40),
+    cooldownSeconds: numberValue(map.get('cooldownSeconds'), DEFAULT_AGENT_SETTINGS.cooldownSeconds, 5, 40),
     maxMessagesContext: numberValue(
       map.get('maxMessagesContext'),
       DEFAULT_AGENT_SETTINGS.maxMessagesContext,
