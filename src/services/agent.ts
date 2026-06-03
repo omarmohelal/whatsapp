@@ -55,6 +55,8 @@ Core behavior:
 - Reply in warm Egyptian Arabic, short but useful. One or two small paragraphs max unless the customer needs steps.
 - No robotic menus, no numbered service menus, no repeated boilerplate, no "تحب أساعدك في 1/2/3/4".
 - Do not ask questions already answered in the conversation.
+- If the conversation already contains the game/service, requested item, customer ID/username, and payment method or proof, treat it as an active order ready for admin review. Do not ask for the same order details again.
+- If the customer sends "تم التحويل", payment screenshot, or a payment receipt after order details are known, acknowledge review and handoff; never ask them to pay again or resend known fields.
 - If the user chose a game/service/package, move forward to the next single step.
 - Ask ONE missing detail at a time. Never stack five questions. If the customer already gave an amount/item, do not ask what service they want again; continue to price/payment/order details.
 - If the customer message is just an acknowledgement (تمام/اوكي/ماشي) and there is no pending question, stay silent. If there is a pending question, answer only the next logical step.
@@ -583,8 +585,11 @@ export class AgentService {
       'payment_vodafone',
       'payment_external',
       'payment_proof',
+      'payment_proof_image',
       'credentials',
-      'order_completed_review'
+      'order_completed_review',
+      'order_details_received',
+      'account_sell'
     ];
     if (lockedIntents.includes(quickReply.intent)) return false;
     // Everything else can be rewritten by Gemini to avoid template-looking replies.

@@ -7,10 +7,11 @@ import { extractIncomingMessengerMessages } from '../src/routes/messengerWebhook
 describe('Messenger webhook', () => {
   it('verifies Messenger webhook challenge', async () => {
     const app = createApp({ env, logger });
+    const verifyToken = env.MESSENGER_VERIFY_TOKEN || env.WHATSAPP_VERIFY_TOKEN;
 
     const response = await request(app).get('/webhooks/messenger').query({
       'hub.mode': 'subscribe',
-      'hub.verify_token': env.WHATSAPP_VERIFY_TOKEN,
+      'hub.verify_token': verifyToken,
       'hub.challenge': 'messenger-challenge'
     });
 

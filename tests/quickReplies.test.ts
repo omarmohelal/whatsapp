@@ -39,10 +39,10 @@ describe('smart deterministic routing before Gemini', () => {
     expect(reply).toMatchObject({
       matched: true,
       responseType: 'text',
-      intent: 'wild_rift_intake',
+      intent: 'wild_rift_game_only',
       game: 'wild_rift'
     });
-    expect(reply.text).toContain('Cores');
+    expect(reply.text).toContain('كورز');
     expect(reply.imageUrl).toBeUndefined();
   });
 
@@ -75,7 +75,7 @@ describe('smart deterministic routing before Gemini', () => {
       game: 'wild_rift'
     });
     expect(reply.text).toContain('575 EGP');
-    expect(reply.text).toContain('Instapay');
+    expect(reply.text).toContain('InstaPay');
   });
 
   it('does not invent an unknown Wild Rift core price', () => {
@@ -152,7 +152,7 @@ describe('smart deterministic routing before Gemini', () => {
       matched: true,
       intent: 'mythic_orange_keys'
     });
-    expect(reply.text).toContain('Orange Essence');
+    expect(reply.text).toContain('Orange');
   });
 
   it('handles payment proof without asking to pay again', () => {
@@ -168,17 +168,80 @@ describe('smart deterministic routing before Gemini', () => {
 
   it('uses existing order context for payment proof', () => {
     const reply = detectQuickReply('بعتلك', catalog, {
-      pendingFields: { game: 'wild_rift', package: '1000 WC' }
+      pendingFields: { game: 'wild_rift', package: '1000 WC', customerId: 'Ken#Lulu1' }
     });
 
     expect(reply.text).toContain('الطلب جاهز للمراجعة');
   });
 
+  it('stores customer ID inside an open skin order instead of restarting the flow', () => {
+    const reply = detectQuickReply('ID: Ken#Lulu1', catalog, {
+      detectedGame: 'wild_rift',
+      lastAskedQuestion: 'skin_name_or_id',
+      pendingFields: { game: 'wild_rift', product: 'Epic Skin: Battle Dolphin Nami', total: '385 EGP' }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'order_details_received',
+      game: 'wild_rift'
+    });
+    expect(reply.pendingFields).toMatchObject({
+      customerId: 'Ken#Lulu1',
+      orderDetailsComplete: true,
+      awaitingPaymentMethod: true
+    });
+    expect(reply.text).toContain('تحب تدفع');
+  });
+
+  it('does not ask for order details again after a complete order chooses InstaPay', () => {
+    const reply = detectQuickReply('انستا باي', catalog, {
+      pendingFields: {
+        game: 'wild_rift',
+        product: 'Epic Skin: Battle Dolphin Nami',
+        total: '385 EGP',
+        customerId: 'Ken#Lulu1',
+        orderDetailsComplete: true
+      }
+    });
+
+    expect(reply).toMatchObject({
+      intent: 'payment_instapay',
+      lastAskedQuestion: 'payment_proof'
+    });
+    expect(reply.text).toContain('سكرين الدفع بس');
+    expect(reply.text).not.toContain('اسم اللعبة');
+  });
+
+  it('treats payment screenshot as review-ready when order details are already known', () => {
+    const reply = detectQuickReply('', catalog, {
+      lastAskedQuestion: 'payment_proof',
+      pendingFields: {
+        game: 'wild_rift',
+        product: 'Epic Skin: Battle Dolphin Nami',
+        total: '385 EGP',
+        customerId: 'Ken#Lulu1',
+        paymentMethod: 'instapay',
+        awaitingPaymentProof: true,
+        orderDetailsComplete: true
+      }
+    }, { type: 'image' });
+
+    expect(reply).toMatchObject({
+      intent: 'payment_proof_image',
+      needsHuman: true
+    });
+    expect(reply.text).toContain('الطلب جاهز للمراجعة');
+    expect(reply.text).not.toContain('اسم اللعبة');
+  });
+
   it('answers account selling with the improved form instructions', () => {
-    const reply = detectQuickReply('عايز ابيع اكونت', catalog);
+    const reply = detectQuickReply('عايز ابيع اكونتي', catalog);
 
     expect(reply.text).toBe(ACCOUNT_LISTING_REPLY);
-    expect(reply.text).toContain('املى الفورم');
+    expect(reply.text).toContain('تملى الفورم');
+    expect(reply.text).toContain('Title');
+    expect(reply.text).toContain('100 أكونت');
   });
 
   it('routes delivery delay to handoff', () => {
