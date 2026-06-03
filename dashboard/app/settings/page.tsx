@@ -39,6 +39,8 @@ export default function SettingsPage() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(true);
   const [cooldownSeconds, setCooldownSeconds] = useState(30);
+  const [replyDebounceSeconds, setReplyDebounceSeconds] = useState(4);
+  const [maxAutoRepliesPerTenMinutes, setMaxAutoRepliesPerTenMinutes] = useState(3);
   const [maxMessagesContext, setMaxMessagesContext] = useState(10);
   const [businessTonePrompt, setBusinessTonePrompt] = useState(defaultTone);
   const [gamesServicesKnowledge, setGamesServicesKnowledge] = useState(defaultKnowledge);
@@ -47,7 +49,7 @@ export default function SettingsPage() {
   );
   const [humanHandoffEnabled, setHumanHandoffEnabled] = useState(true);
   const [ignoreStickers, setIgnoreStickers] = useState(true);
-  const [groupRepliesEnabled, setGroupRepliesEnabled] = useState(true);
+  const [groupRepliesEnabled, setGroupRepliesEnabled] = useState(false);
   const [groupPromoEnabled, setGroupPromoEnabled] = useState(false);
   const [groupPromoIntervalMinutes, setGroupPromoIntervalMinutes] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -64,6 +66,8 @@ export default function SettingsPage() {
         setAiEnabled(settings.aiEnabled ?? true);
         setAutoReplyEnabled(settings.autoReplyEnabled ?? true);
         setCooldownSeconds(settings.cooldownSeconds ?? 30);
+        setReplyDebounceSeconds(settings.replyDebounceSeconds ?? 4);
+        setMaxAutoRepliesPerTenMinutes(settings.maxAutoRepliesPerTenMinutes ?? 3);
         setMaxMessagesContext(settings.maxMessagesContext ?? 10);
         setBusinessTonePrompt(settings.businessTonePrompt ?? defaultTone);
         setGamesServicesKnowledge(settings.gamesServicesKnowledge ?? defaultKnowledge);
@@ -75,7 +79,7 @@ export default function SettingsPage() {
         );
         setHumanHandoffEnabled(settings.humanHandoffEnabled ?? true);
         setIgnoreStickers(settings.ignoreStickers ?? true);
-        setGroupRepliesEnabled(settings.groupRepliesEnabled ?? true);
+        setGroupRepliesEnabled(settings.groupRepliesEnabled ?? false);
         setGroupPromoEnabled(settings.groupPromoEnabled ?? false);
         setGroupPromoIntervalMinutes(settings.groupPromoIntervalMinutes ?? 0);
       })
@@ -94,6 +98,8 @@ export default function SettingsPage() {
         aiEnabled,
         autoReplyEnabled,
         cooldownSeconds,
+        replyDebounceSeconds,
+        maxAutoRepliesPerTenMinutes,
         maxMessagesContext,
         businessTonePrompt,
         gamesServicesKnowledge,
@@ -166,11 +172,33 @@ export default function SettingsPage() {
               Cooldown seconds
               <input
                 type="number"
-                min={20}
+                min={5}
                 max={40}
                 className="mt-1 w-full rounded-md border border-nexus-line bg-black/20 p-2"
                 value={cooldownSeconds}
                 onChange={(event) => setCooldownSeconds(Number(event.target.value))}
+              />
+            </label>
+            <label className="text-sm text-slate-300">
+              Reply debounce seconds
+              <input
+                type="number"
+                min={0}
+                max={10}
+                className="mt-1 w-full rounded-md border border-nexus-line bg-black/20 p-2"
+                value={replyDebounceSeconds}
+                onChange={(event) => setReplyDebounceSeconds(Number(event.target.value))}
+              />
+            </label>
+            <label className="text-sm text-slate-300">
+              Max auto replies / 10 min
+              <input
+                type="number"
+                min={1}
+                max={10}
+                className="mt-1 w-full rounded-md border border-nexus-line bg-black/20 p-2"
+                value={maxAutoRepliesPerTenMinutes}
+                onChange={(event) => setMaxAutoRepliesPerTenMinutes(Number(event.target.value))}
               />
             </label>
             <label className="text-sm text-slate-300">

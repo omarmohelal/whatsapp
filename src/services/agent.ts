@@ -185,18 +185,13 @@ export class AgentService {
       waId: input.waId
     };
 
-    const latestConversation = await this.deps.prisma.conversation.findUniqueOrThrow({
+    let latestConversation = await this.deps.prisma.conversation.findUniqueOrThrow({
       where: { id: conversation.id }
     });
-    const conversationMemory = this.buildConversationMemory(latestConversation);
+    let conversationMemory = this.buildConversationMemory(latestConversation);
     const settings = await loadAgentSettings(this.deps.prisma, business.id);
 
-    if (
-      latestConversation.handoffStatus === 'ACTIVE' ||
-      latestConversation.handoffStatus === 'REQUESTED' ||
-      !latestConversation.aiEnabled ||
-      !settings.aiEnabled
-    ) {
+    if (this.isAutoReplyDisabled(latestConversation, settings)) {
       this.deps.logger.info(
         {
           messageId: input.messageId,
@@ -206,6 +201,29 @@ export class AgentService {
           globalAiEnabled: settings.aiEnabled
         },
         'Skipping auto response because conversation is in handoff or AI is disabled'
+      );
+      return;
+    }
+
+    if (await this.shouldSkipStaleInboundAfterDebounce(conversation.id, input.messageId, inboundMessage.createdAt, settings)) {
+      return;
+    }
+
+    latestConversation = await this.deps.prisma.conversation.findUniqueOrThrow({
+      where: { id: conversation.id }
+    });
+    conversationMemory = this.buildConversationMemory(latestConversation);
+
+    if (this.isAutoReplyDisabled(latestConversation, settings)) {
+      this.deps.logger.info(
+        {
+          messageId: input.messageId,
+          conversationId: conversation.id,
+          handoffStatus: latestConversation.handoffStatus,
+          aiEnabled: latestConversation.aiEnabled,
+          globalAiEnabled: settings.aiEnabled
+        },
+        'Skipping auto response after debounce because conversation is in handoff or AI is disabled'
       );
       return;
     }
@@ -456,6 +474,66 @@ export class AgentService {
     };
   }
 
+  private isAutoReplyDisabled(
+    conversation: { handoffStatus?: string | null; aiEnabled?: boolean | null },
+    settings: AgentSettings
+  ) {
+    return (
+      conversation.handoffStatus === 'ACTIVE' ||
+      conversation.handoffStatus === 'REQUESTED' ||
+      !conversation.aiEnabled ||
+      !settings.aiEnabled
+    );
+  }
+
+  private async shouldSkipStaleInboundAfterDebounce(
+    conversationId: string,
+    messageId: string,
+    currentCreatedAt: Date | undefined,
+    settings: AgentSettings
+  ) {
+    if (settings.replyDebounceSeconds > 0) {
+      await this.sleep(settings.replyDebounceSeconds * 1000);
+    }
+
+    if (!currentCreatedAt) {
+      return false;
+    }
+
+    const newerInbound = await this.deps.prisma.message.findFirst({
+      where: {
+        conversationId,
+        direction: 'INBOUND',
+        channelMessageId: { not: messageId },
+        createdAt: { gt: currentCreatedAt }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, channelMessageId: true, createdAt: true }
+    });
+
+    if (!newerInbound) {
+      return false;
+    }
+
+    this.deps.logger.info(
+      {
+        conversationId,
+        messageId,
+        newerMessageId: newerInbound.channelMessageId,
+        newerCreatedAt: newerInbound.createdAt
+      },
+      'Skipped stale inbound message because a newer customer message arrived during debounce'
+    );
+    return true;
+  }
+
+  private sleep(ms: number) {
+    if (ms <= 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   private async getIgnoreReason(args: {
     input: IncomingWhatsAppJob;
     text: string;
@@ -513,6 +591,10 @@ export class AgentService {
       return 'no_clear_business_intent';
     }
 
+    if (await this.isAutoReplyBudgetExceeded(args.conversationId, args.settings, args.quickReply)) {
+      return 'auto_reply_budget_exceeded';
+    }
+
     if (
       isWithinCooldown(lastOutbound?.createdAt, args.settings.cooldownSeconds) &&
       !clearIntent &&
@@ -522,6 +604,47 @@ export class AgentService {
     }
 
     return null;
+  }
+
+  private async isAutoReplyBudgetExceeded(
+    conversationId: string,
+    settings: AgentSettings,
+    quickReply: QuickReplyResult
+  ) {
+    const criticalIntents = [
+      'credentials',
+      'human_handoff',
+      'payment_methods',
+      'payment_instapay',
+      'payment_vodafone',
+      'payment_external',
+      'payment_proof',
+      'payment_proof_image',
+      'delivery_delay',
+      'order_completed_review'
+    ];
+    if (quickReply.needsHuman || criticalIntents.includes(quickReply.intent)) {
+      return false;
+    }
+
+    const since = new Date(Date.now() - 10 * 60 * 1000);
+    const recentAutoReplies = await this.deps.prisma.message.count({
+      where: {
+        conversationId,
+        direction: 'OUTBOUND',
+        createdAt: { gte: since }
+      }
+    });
+
+    if (recentAutoReplies < settings.maxAutoRepliesPerTenMinutes) {
+      return false;
+    }
+
+    this.deps.logger.info(
+      { conversationId, recentAutoReplies, maxAutoRepliesPerTenMinutes: settings.maxAutoRepliesPerTenMinutes },
+      'Skipped auto reply because conversation reply budget is exhausted'
+    );
+    return true;
   }
 
   private shouldAnswerGroupGreeting(messageId: string) {
@@ -801,6 +924,13 @@ ${text}`;
     }
 
     const pending = memory.pendingFields ?? {};
+    if (
+      pending.orderDetailsComplete &&
+      /اسم اللعبة|تفاصيل الطلب|بيانات الطلب|id\/username|الـ id|اليوزر|username/i.test(reply)
+    ) {
+      return 'تمام ❤️ كده الطلب واضح وجاهز للمراجعة. الأدمن هيأكد الدفع أو أي تفصيلة ناقصة ويبدأ التنفيذ.';
+    }
+
     const isWildRiftContext = memory.detectedGame === 'wild_rift' || pending.game === 'wild_rift';
     if (isWildRiftContext && /كور|cores|core/.test(normalizedCustomer) && /كورز ولا سكن|سكن ولا كورز|cores ولا/i.test(reply)) {
       if (/10\s*(k|الف|الاف|ألف|آلاف|تلاف)|10000/.test(normalizedCustomer)) {

@@ -148,4 +148,118 @@ describe('agent idempotency', () => {
     expect(whatsapp.sendText).not.toHaveBeenCalled();
     expect(ai.createChatCompletion).not.toHaveBeenCalled();
   });
+
+  it('skips an older inbound message when a newer customer message arrived before reply generation', async () => {
+    const inboundCreatedAt = new Date('2026-06-04T10:00:00.000Z');
+    const prisma = {
+      business: { upsert: jest.fn().mockResolvedValue({ id: 'business-id', slug: 'thenexus' }) },
+      contact: { upsert: jest.fn().mockResolvedValue({ id: 'contact-id' }) },
+      conversation: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        update: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'conversation-id',
+          handoffStatus: 'NONE',
+          aiEnabled: true,
+          lastIntent: null,
+          detectedGame: null,
+          lastAskedQuestion: null,
+          pendingFields: null
+        })
+      },
+      message: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'newer-inbound-id',
+          channelMessageId: 'wamid.newer',
+          createdAt: new Date('2026-06-04T10:00:01.000Z')
+        }),
+        create: jest.fn().mockResolvedValue({ id: 'inbound-id', createdAt: inboundCreatedAt })
+      },
+      adminSetting: { findMany: jest.fn().mockResolvedValue([{ key: 'replyDebounceSeconds', value: 0 }]) }
+    };
+    const whatsapp = { sendText: jest.fn(), sendImage: jest.fn() };
+    const mediaCatalog = { listActive: jest.fn() };
+    const agent = new AgentService({
+      prisma: prisma as never,
+      whatsapp,
+      knowledge: {} as never,
+      mediaCatalog: mediaCatalog as never,
+      ai: {} as never,
+      env,
+      logger
+    });
+
+    await agent.handleIncomingMessage({
+      waId: '201000000000',
+      messageId: 'wamid.old',
+      text: 'عايز اشحن',
+      type: 'text',
+      raw: {
+        id: 'wamid.old',
+        from: '201000000000',
+        type: 'text',
+        text: { body: 'عايز اشحن' }
+      }
+    });
+
+    expect(mediaCatalog.listActive).not.toHaveBeenCalled();
+    expect(whatsapp.sendText).not.toHaveBeenCalled();
+  });
+
+  it('stops non-critical auto replies after the conversation reply budget is exhausted', async () => {
+    const prisma = {
+      business: { upsert: jest.fn().mockResolvedValue({ id: 'business-id', slug: 'thenexus' }) },
+      contact: { upsert: jest.fn().mockResolvedValue({ id: 'contact-id' }) },
+      conversation: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        update: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'conversation-id',
+          handoffStatus: 'NONE',
+          aiEnabled: true,
+          lastIntent: null,
+          detectedGame: null,
+          lastAskedQuestion: null,
+          pendingFields: null
+        })
+      },
+      message: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null),
+        count: jest.fn().mockResolvedValue(3),
+        create: jest.fn().mockResolvedValue({ id: 'inbound-id', createdAt: new Date('2026-06-04T10:00:00.000Z') })
+      },
+      adminSetting: { findMany: jest.fn().mockResolvedValue([]) }
+    };
+    const whatsapp = { sendText: jest.fn(), sendImage: jest.fn() };
+    const agent = new AgentService({
+      prisma: prisma as never,
+      whatsapp,
+      knowledge: {} as never,
+      mediaCatalog: { listActive: jest.fn().mockResolvedValue([]) } as never,
+      ai: {} as never,
+      env,
+      logger
+    });
+
+    await agent.handleIncomingMessage({
+      waId: '201000000000',
+      messageId: 'wamid.budget',
+      text: 'السلام عليكم',
+      type: 'text',
+      raw: {
+        id: 'wamid.budget',
+        from: '201000000000',
+        type: 'text',
+        text: { body: 'السلام عليكم' }
+      }
+    });
+
+    expect(prisma.message.count).toHaveBeenCalled();
+    expect(whatsapp.sendText).not.toHaveBeenCalled();
+  });
 });

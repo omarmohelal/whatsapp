@@ -189,6 +189,17 @@ Pages included:
 - Analytics
 - Settings
 
+Recommended v2 anti-spam settings:
+
+- `autoReplyEnabled=true`
+- `cooldownSeconds=30`
+- `replyDebounceSeconds=4`
+- `maxAutoRepliesPerTenMinutes=3`
+- `ignoreStickers=true`
+- `groupRepliesEnabled=false`
+
+Use the Settings page to make the bot quieter or more active without redeploying.
+
 ## Admin API
 
 All `/admin/*` routes except `/admin/login` require `x-admin-api-key: ADMIN_API_KEY`.
@@ -277,4 +288,3 @@ npx prisma validate
 - Payment proof, delays, and complaints are routed to admin review.
 - Sellers who do not know an account price should enter `0` in expected payout.
 - First/Original Email explanation is built into the bot.
-
