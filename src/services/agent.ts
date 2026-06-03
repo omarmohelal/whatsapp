@@ -13,6 +13,7 @@ import type { AppLogger } from '../logger';
 import type { IncomingWhatsAppJob } from '../types/whatsapp';
 import {
   hasClearIntent,
+  isLowSignalText,
   isShortAck,
   isUnclearMessage,
   isWithinCooldown,
@@ -190,6 +191,25 @@ export class AgentService {
     const conversationMemory = this.buildConversationMemory(latestConversation);
     const settings = await loadAgentSettings(this.deps.prisma, business.id);
 
+    if (
+      latestConversation.handoffStatus === 'ACTIVE' ||
+      latestConversation.handoffStatus === 'REQUESTED' ||
+      !latestConversation.aiEnabled ||
+      !settings.aiEnabled
+    ) {
+      this.deps.logger.info(
+        {
+          messageId: input.messageId,
+          conversationId: conversation.id,
+          handoffStatus: latestConversation.handoffStatus,
+          aiEnabled: latestConversation.aiEnabled,
+          globalAiEnabled: settings.aiEnabled
+        },
+        'Skipping auto response because conversation is in handoff or AI is disabled'
+      );
+      return;
+    }
+
     const mediaCatalog = await this.deps.mediaCatalog.listActive(business.id);
     const quickReply = detectQuickReply(text, mediaCatalog, conversationMemory, { type: input.type });
     this.deps.logger.info(
@@ -260,25 +280,6 @@ export class AgentService {
         'Selected intent'
       );
       await this.handleQuickReply(ctx, inboundMessage.id, quickReply, text);
-      return;
-    }
-
-    if (
-      latestConversation.handoffStatus === 'ACTIVE' ||
-      latestConversation.handoffStatus === 'REQUESTED' ||
-      !latestConversation.aiEnabled ||
-      !settings.aiEnabled
-    ) {
-      this.deps.logger.info(
-        {
-          messageId: input.messageId,
-          conversationId: conversation.id,
-          handoffStatus: latestConversation.handoffStatus,
-          aiEnabled: latestConversation.aiEnabled,
-          globalAiEnabled: settings.aiEnabled
-        },
-        'Skipping AI response because conversation is in handoff or AI is disabled'
-      );
       return;
     }
 
@@ -486,21 +487,32 @@ export class AgentService {
       }
     }
 
+    const inOpenFlow = Boolean(args.memory.lastAskedQuestion || args.memory.pendingFields?.awaitingPaymentMethod || args.memory.pendingFields?.awaitingPaymentProof);
+    const clearIntent = hasClearIntent(args.text, args.input.type) || args.quickReply.matched;
+
     if (isUnclearMessage(args.text, args.input.type)) {
-      if (args.input.type === 'sticker' && args.settings.ignoreStickers) {
-        return args.memory.pendingFields?.unclearReplySent ? 'sticker_ignored_after_unclear' : 'unclear_reply_once';
-      }
-      return args.memory.pendingFields?.unclearReplySent ? 'unclear_repeated' : 'unclear_reply_once';
+      return args.input.type === 'sticker' && args.settings.ignoreStickers
+        ? 'sticker_ignored'
+        : 'unclear_message_ignored';
     }
 
-    const inOpenFlow = Boolean(args.memory.lastAskedQuestion || args.memory.pendingFields?.awaitingPaymentMethod || args.memory.pendingFields?.awaitingPaymentProof);
+    if (args.input.type === 'image' && !args.quickReply.matched) {
+      return 'image_ignored_no_active_request';
+    }
+
+    if (isLowSignalText(args.text) && !args.quickReply.matched) {
+      return 'low_signal_message_ignored';
+    }
 
     if (isShortAck(args.text) && !hasClearIntent(args.text, args.input.type) && !inOpenFlow) {
       return 'short_ack_no_followup';
     }
 
     const lastOutbound = await this.getLastOutboundMessage(args.conversationId);
-    const clearIntent = hasClearIntent(args.text, args.input.type) || args.quickReply.matched;
+    if (!clearIntent && !inOpenFlow) {
+      return 'no_clear_business_intent';
+    }
+
     if (
       isWithinCooldown(lastOutbound?.createdAt, args.settings.cooldownSeconds) &&
       !clearIntent &&

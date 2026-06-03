@@ -22,6 +22,29 @@ const shortAckSet = new Set(
   ].map(normalizeForIntent)
 );
 
+const lowSignalSet = new Set(
+  [
+    'ده',
+    'دا',
+    'دي',
+    'دول',
+    'كده',
+    'كدا',
+    'لا',
+    'اه',
+    'اها',
+    'ايوه',
+    'يب',
+    'لازم',
+    'مين',
+    'فين',
+    'هو',
+    'هي',
+    'lol',
+    'lmao'
+  ].map(normalizeForIntent)
+);
+
 const clearIntentKeywords = [
   '؟',
   '?',
@@ -100,15 +123,32 @@ export function isUnclearMessage(text: string, type: string) {
   return isEmojiOnly(text);
 }
 
-export function hasClearIntent(text: string, type: string) {
-  if (type === 'image') {
+export function isLowSignalText(text: string) {
+  const normalized = normalizeForIntent(text).replace(/[.!؟?،,\s]+$/g, '').trim();
+  if (!normalized) {
     return true;
   }
+  if (isShortAck(normalized)) {
+    return true;
+  }
+  if (lowSignalSet.has(normalized)) {
+    return true;
+  }
+  return normalized.length <= 2 && !/\d/.test(normalized);
+}
+
+export function hasClearIntent(text: string, _type: string) {
   if (isShortAck(text)) {
     return false;
   }
+  if (/[؟?]/.test(text)) {
+    return true;
+  }
   const normalized = normalizeForIntent(text);
-  return clearIntentKeywords.some((keyword) => normalized.includes(normalizeForIntent(keyword)));
+  return clearIntentKeywords.some((keyword) => {
+    const needle = normalizeForIntent(keyword);
+    return Boolean(needle) && normalized.includes(needle);
+  });
 }
 
 export function normalizeComparableReply(text: string) {

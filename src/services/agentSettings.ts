@@ -17,7 +17,7 @@ export interface AgentSettings {
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   aiEnabled: true,
   autoReplyEnabled: true,
-  cooldownSeconds: 10,
+  cooldownSeconds: 30,
   maxMessagesContext: 10,
   businessTonePrompt:
     'رد بالمصري، مختصر، محترم، ودود ومناسب للمبيعات. اسأل سؤال واحد بس لما تحتاج توضيح.',
@@ -25,7 +25,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     'TheNexus يدعم شحن Wild Rift وLeague RP وValorant VP، هدايا/سكنات Riot، وبيع وشراء الأكونتات. لا تخترع أسعار أو توفر.',
   humanHandoffEnabled: true,
   ignoreStickers: true,
-  groupRepliesEnabled: true,
+  groupRepliesEnabled: false,
   groupPromoEnabled: false,
   groupPromoIntervalMinutes: 0
 };

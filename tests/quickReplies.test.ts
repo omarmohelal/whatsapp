@@ -235,6 +235,32 @@ describe('smart deterministic routing before Gemini', () => {
     expect(reply.text).not.toContain('اسم اللعبة');
   });
 
+  it('ignores image-only noise when no active image request exists', () => {
+    const reply = detectQuickReply('', catalog, {}, { type: 'image' });
+
+    expect(reply).toMatchObject({
+      matched: false,
+      responseType: 'ai',
+      intent: 'image_ignored'
+    });
+  });
+
+  it('does not repeat image helper replies in the same flow', () => {
+    const reply = detectQuickReply('', catalog, {
+      lastAskedQuestion: 'skin_name_or_id',
+      pendingFields: {
+        game: 'wild_rift',
+        product: 'Epic Skin',
+        imageReplySent: true
+      }
+    }, { type: 'image' });
+
+    expect(reply).toMatchObject({
+      matched: false,
+      intent: 'image_ignored'
+    });
+  });
+
   it('answers account selling with the improved form instructions', () => {
     const reply = detectQuickReply('عايز ابيع اكونتي', catalog);
 

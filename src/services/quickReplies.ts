@@ -545,7 +545,9 @@ function isGiftExplanationRequest(text: string, memory: ConversationMemory) {
 
 function imageContextReply(memory: ConversationMemory) {
   const pending = memory.pendingFields ?? {};
-  const game = normalizeMemoryGame(String(pending.game ?? memory.detectedGame ?? ''));
+  if (pending.imageReplySent) {
+    return undefined;
+  }
   if (hasOrderDetails(memory) && (pending.awaitingPaymentProof || memory.lastAskedQuestion === 'payment_proof' || pending.paymentMethod)) {
     return {
       text: 'وصلت الصورة يا فندم ❤️ كده الطلب جاهز للمراجعة. الأدمن هيأكد الدفع ويبدأ التنفيذ، ولو ناقص أي تفصيلة هيكلمك فورًا.',
@@ -568,16 +570,7 @@ function imageContextReply(memory: ConversationMemory) {
       intent: 'skin_image_received'
     };
   }
-  if (game) {
-    return {
-      text: `وصلت الصورة ❤️ لو دي خاصة بـ ${game === 'wild_rift' ? 'Wild Rift' : game === 'league' ? 'League' : 'Valorant'} ابعت المطلوب في سطر واحد: سعر؟ شحن؟ مشكلة؟ عشان أرد عليك من غير لخبطة.`,
-      intent: 'context_image_received'
-    };
-  }
-  return {
-    text: 'وصلت الصورة ❤️ محتاج أعرف المطلوب منها: تسعير، شحن، سكن، ولا مشكلة في طلب؟',
-    intent: 'unknown_image_received'
-  };
+  return undefined;
 }
 
 function hasOrderDetails(memory: ConversationMemory) {
@@ -691,10 +684,13 @@ export function detectQuickReply(
 
   if (options.type === 'image' && !normalizedText) {
     const imageReply = imageContextReply(memory);
+    if (!imageReply) {
+      return aiResult('image_ignored', false);
+    }
     return textResult({
       ...imageReply,
       game,
-      pendingFields: pendingFields(pending, { imageReceived: true })
+      pendingFields: pendingFields(pending, { imageReceived: true, imageReplySent: true })
     });
   }
 

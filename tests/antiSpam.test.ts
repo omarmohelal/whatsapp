@@ -1,6 +1,7 @@
 import {
   hasClearIntent,
   isEmojiOnly,
+  isLowSignalText,
   isShortAck,
   isUnclearMessage,
   isWithinCooldown,
@@ -20,10 +21,17 @@ describe('anti-spam helpers', () => {
     expect(isUnclearMessage('عايز اشحن', 'text')).toBe(false);
   });
 
+  it('treats low-signal chat filler as unsafe for auto replies', () => {
+    expect(isLowSignalText('ده')).toBe(true);
+    expect(isLowSignalText('لا')).toBe(true);
+    expect(isLowSignalText('عايز اشحن')).toBe(false);
+  });
+
   it('detects clear purchase/payment intent for cooldown bypass', () => {
     expect(hasClearIntent('عايز اشحن وايلد', 'text')).toBe(true);
     expect(hasClearIntent('تم التحويل', 'text')).toBe(true);
     expect(hasClearIntent('تمام', 'text')).toBe(false);
+    expect(hasClearIntent('', 'image')).toBe(false);
   });
 
   it('detects similar repeated bot replies', () => {
