@@ -1,6 +1,9 @@
 import {
+  ACCOUNT_BUYING_REPLY,
   ACCOUNT_LISTING_REPLY,
+  ACCOUNT_SELLING_HELP_REPLY,
   CREDENTIALS_REPLY,
+  FIRST_EMAIL_EXPLAIN_REPLY,
   HUMAN_HANDOFF_REPLY,
   LEAGUE_SKIN_GIFT_REPLY,
   ORDER_COMPLETED_REVIEW_REPLY,
@@ -97,6 +100,22 @@ const accountSellKeywords = [
   'list account'
 ];
 const accountBuyKeywords = ['اشتري اكونت', 'عايز اكونت', 'اكونت للبيع', 'buy account', 'account available'];
+const accountFormKeywords = [
+  'الفورم',
+  'فورم',
+  'form',
+  'thenexus.ink',
+  'خانة',
+  'خانه',
+  'title',
+  'description',
+  'first email',
+  'blue essence',
+  'recovery email',
+  '2fa',
+  'اعمل ايه في الفورم',
+  'مش فاهم الفورم'
+];
 const giftKeywords = ['gift', 'جيفت', 'جفت', 'هدية', 'هديه', 'skin', 'skins', 'سكن', 'سكنات', 'اسكن', 'اسكين', 'سكنه', 'سكين'];
 const wildRiftCoreKeywords = ['core', 'cores', 'wild core', 'wild cores', 'كور', 'كورز', 'كورس', 'كوريز', 'ويلد كور'];
 const mythicKeywords = ['mythic', 'prestige', 'orange essence', 'orange', 'ميثك', 'برستيج', 'اورنج', 'مفاتيح', 'key', 'keys'];
@@ -510,6 +529,10 @@ function pendingHelpReply(memory: ConversationMemory) {
   const asked = memory.lastAskedQuestion;
   const game = normalizeMemoryGame(String(pending.game ?? memory.detectedGame ?? ''));
 
+  if (asked === 'account_form' || pending.flow === 'account_sell' || pending.formSent) {
+    return ACCOUNT_SELLING_HELP_REPLY;
+  }
+
   if (asked === 'league_gift_details' || pending.product === 'skin_or_gift') {
     return 'ولا يهمك ❤️ لو ده League Skin/Gift المطلوب منك بس: Riot ID + السيرفر + اسم السكن أو صورته.\nبعد ما تضيفنا كصديق، الهدية بتتبعت بعد 7 أيام حسب نظام Riot.';
   }
@@ -533,6 +556,68 @@ function pendingHelpReply(memory: ConversationMemory) {
 
 function isGenericConfusion(text: string) {
   return hasAny(text, confusionKeywords) || hasAny(text, unsupportedOrNoiseKeywords);
+}
+
+function isAccountFormHelpRequest(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const formContext = memory.lastAskedQuestion === 'account_form' || pending.flow === 'account_sell' || pending.formSent === true;
+  return (
+    hasAny(text, accountFormKeywords) ||
+    (formContext && isGenericConfusion(text))
+  ) && !hasAny(text, accountBuyKeywords);
+}
+
+function accountFormHelpReply(text: string) {
+  if (hasAny(text, ['first email', 'first mail', 'اول ايميل', 'اول اميل', 'الايميل الاصلي', 'original email'])) {
+    return FIRST_EMAIL_EXPLAIN_REPLY;
+  }
+
+  if (hasAny(text, ['title', 'تايتل', 'عنوان'])) {
+    return `الـ Title ده عنوان مختصر للأكونت ❤️
+اكتب فيه أهم 4-5 حاجات تخلي العميل يفتح التفاصيل.
+
+مثال:
+EUNE | Plat | 379 Skins | First Mail + Full Access
+
+خليه قصير وواضح، والتفاصيل الكتير خليها في الـ Description.`;
+  }
+
+  if (hasAny(text, ['description', 'ديسكربشن', 'وصف'])) {
+    return `الـ Description هو تفاصيل الأكونت ❤️
+اكتب فيه:
+- اللفل
+- الرانك الحالي وأعلى رانك
+- عدد السكينات والأبطال/الشخصيات
+- أهم السكينات النادرة
+- هل معاه First Email ولا لأ
+- أي ملاحظات مهمة
+
+لو الصور كتير، ارفعها على Imgur أو فيديو وابعت اللينك في الوصف.`;
+  }
+
+  if (hasAny(text, ['السعر', 'سعر', 'price', 'بكام', 'اسعر'])) {
+    return `بالنسبة للسعر ❤️
+لو عارف سعر مناسب اكتبه في الفورم.
+لو مش عارف، سيبه فاضي أو اكتب "مش عارف"، والأدمن يراجع الأكونت ويسعره لك.
+
+الأفضل السعر يبقى منافس عشان الأكونت يتباع أسرع.`;
+  }
+
+  if (hasAny(text, ['صور', 'صوره', 'فيديو', 'imgur', 'رفع الصور'])) {
+    return `بالنسبة للصور ❤️
+حط صور واضحة لأهم الحاجات: الرانك، عدد السكينات، السكينات النادرة، والعملات.
+
+لو الصور كتير، ارفع باقي الصور أو فيديو على Imgur وحط اللينك في الـ Description.`;
+  }
+
+  if (hasAny(text, ['2fa', 'حمايه', 'حماية', 'recovery', 'رقم موبايل'])) {
+    return `قبل التسليم مهم جدًا ❤️
+شيل 2FA، وأي رقم موبايل، وأي Recovery Email من الأكونت أو الإيميل.
+
+ده بيخلي التسليم آمن وسريع للعميل.`;
+  }
+
+  return ACCOUNT_SELLING_HELP_REPLY;
 }
 
 function isGiftExplanationRequest(text: string, memory: ConversationMemory) {
@@ -630,6 +715,15 @@ export function detectQuickReply(
       needsHuman: true,
       sensitive: true,
       handoffReason: 'sensitive_credentials'
+    });
+  }
+
+  if (isAccountFormHelpRequest(text, memory)) {
+    return textResult({
+      text: accountFormHelpReply(text),
+      intent: 'account_form_help',
+      lastAskedQuestion: 'account_form',
+      pendingFields: pendingFields(pending, { flow: 'account_sell', formHelpSent: true })
     });
   }
 
@@ -926,7 +1020,12 @@ export function detectQuickReply(
   }
 
   if (hasAny(text, accountBuyKeywords)) {
-    return aiResult('account_buy', priceRequest);
+    return textResult({
+      text: ACCOUNT_BUYING_REPLY,
+      intent: 'account_buy',
+      lastAskedQuestion: 'account_buy_preferences',
+      pendingFields: pendingFields(pending, { flow: 'account_buy', awaitingAccountPreferences: true })
+    });
   }
 
   // Greetings are safe to answer directly, but keep them short and non-menu-like.

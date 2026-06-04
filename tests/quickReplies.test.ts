@@ -1,5 +1,7 @@
 import {
+  ACCOUNT_BUYING_REPLY,
   ACCOUNT_LISTING_REPLY,
+  ACCOUNT_SELLING_HELP_REPLY,
   LEAGUE_SKIN_GIFT_REPLY,
   PAYMENT_METHODS_REPLY,
   PAYMENT_PROOF_REPLY
@@ -265,9 +267,74 @@ describe('smart deterministic routing before Gemini', () => {
     const reply = detectQuickReply('عايز ابيع اكونتي', catalog);
 
     expect(reply.text).toBe(ACCOUNT_LISTING_REPLY);
-    expect(reply.text).toContain('تملى الفورم');
+    expect(reply.text).toContain('املأ الفورم');
     expect(reply.text).toContain('Title');
-    expect(reply.text).toContain('100 أكونت');
+    expect(reply.text).toContain('الأدمن هيراجع');
+  });
+
+  it('prioritizes account form help over old game context', () => {
+    const reply = detectQuickReply('بعد اذنك مطلوب في الفورم مش فاهمه ممكن تساعد؟', catalog, {
+      detectedGame: 'wild_rift',
+      pendingFields: { game: 'wild_rift' }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'account_form_help',
+      text: ACCOUNT_SELLING_HELP_REPLY
+    });
+    expect(reply.text).toContain('اللعبة والسيرفر');
+    expect(reply.text).not.toContain('كورز');
+  });
+
+  it('answers form confusion in an account-selling flow instead of falling back to game help', () => {
+    const reply = detectQuickReply('مش فاهم اعمل ايه', catalog, {
+      detectedGame: 'wild_rift',
+      lastAskedQuestion: 'account_form',
+      pendingFields: { flow: 'account_sell', formSent: true, game: 'wild_rift' }
+    });
+
+    expect(reply).toMatchObject({
+      intent: 'account_form_help',
+      text: ACCOUNT_SELLING_HELP_REPLY
+    });
+  });
+
+  it('keeps account form problems in form-help instead of handoff', () => {
+    const reply = detectQuickReply('عندي مشكلة في الفورم مش فاهم خانة السعر', catalog, {
+      detectedGame: 'wild_rift',
+      pendingFields: { game: 'wild_rift' }
+    });
+
+    expect(reply).toMatchObject({
+      intent: 'account_form_help'
+    });
+    expect(reply.needsHuman).toBeUndefined();
+    expect(reply.text).toContain('السعر');
+    expect(reply.text).not.toContain('الأدمن هيراجع معاك');
+  });
+
+  it('explains specific account form fields directly', () => {
+    const reply = detectQuickReply('يعني ايه Title في الفورم؟', catalog, {
+      pendingFields: { flow: 'account_sell', formSent: true }
+    });
+
+    expect(reply).toMatchObject({
+      intent: 'account_form_help'
+    });
+    expect(reply.text).toContain('عنوان مختصر');
+    expect(reply.text).toContain('EUNE');
+  });
+
+  it('answers clear account buying requests with useful required preferences', () => {
+    const reply = detectQuickReply('عايز اشتري اكونت ليج', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'account_buy',
+      text: ACCOUNT_BUYING_REPLY
+    });
+    expect(reply.text).toContain('الميزانية');
   });
 
   it('routes delivery delay to handoff', () => {

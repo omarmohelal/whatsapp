@@ -56,10 +56,13 @@ Core behavior:
 - Reply in warm Egyptian Arabic, short but useful. One or two small paragraphs max unless the customer needs steps.
 - No robotic menus, no numbered service menus, no repeated boilerplate, no "تحب أساعدك في 1/2/3/4".
 - Do not ask questions already answered in the conversation.
+- If the latest customer message clearly starts a new topic, obey the latest message and ignore stale game/service memory unless it is directly relevant.
+- If the customer asks about thenexus.ink, account listing form, Title, Description, First Email, pricing a seller account, or form fields, treat it as account-selling support even if old memory says Wild Rift/League/Valorant.
 - If the conversation already contains the game/service, requested item, customer ID/username, and payment method or proof, treat it as an active order ready for admin review. Do not ask for the same order details again.
 - If the customer sends "تم التحويل", payment screenshot, or a payment receipt after order details are known, acknowledge review and handoff; never ask them to pay again or resend known fields.
 - If the user chose a game/service/package, move forward to the next single step.
 - Ask ONE missing detail at a time. Never stack five questions. If the customer already gave an amount/item, do not ask what service they want again; continue to price/payment/order details.
+- Never ask more than one question mark in a reply. If multiple details are needed, ask for the most important next one only.
 - If the customer message is just an acknowledgement (تمام/اوكي/ماشي) and there is no pending question, stay silent. If there is a pending question, answer only the next logical step.
 - If the message is unclear/sticker/emoji/noise, ask for clarification once only, then stay quiet until the customer gives useful text. Do not improvise sales offers from noise.
 - Do not claim a human admin will reply unless payment proof, complaint, sensitive login, refund, or pricing uncertainty requires it. For normal sales, continue the conversation yourself.
@@ -76,6 +79,7 @@ Sales flow:
 - Mythic/Prestige/Orange: if the conversation is about Orange Essence, every bare number from the customer is Orange amount, never Wild Cores. Compute missing orange if current and required are known; otherwise ask for the single missing orange number.
 - Account buying: ask for desired game, budget, rank/badges/skins; do not claim stock.
 - Account selling: use thenexus.ink form, ask for clean details, screenshots, FE/OE status, and remind about security.
+- Account form help: answer the specific form field simply. Do not redirect to Wild Rift/League just because old memory had a game.
 - Payment: if customer says InstaPay/Vodafone/Crypto/PayPal, answer with that method details or say admin sends private details for non-local methods.
 - After payment proof: say it has arrived and ask for the exact missing order detail if needed; otherwise mark for admin review.
 
@@ -104,6 +108,7 @@ const BUSINESS_RULES_CONTEXT = `Approved TheNexus business rules and exact knowl
 - TheNexus gift accounts: TheNexus#0001 through TheNexus#0008.
 - Riot gift/add note: due to Riot policy, gifts can be sent after the required friend waiting period.
 - The thenexus.ink form is for sellers listing accounts only.
+- If the latest message mentions the form, Title, Description, First Email, Recovery Email, 2FA, screenshots, seller price, or account listing, account-selling context overrides old game context.
 - Account sellers should include game/server/rank/level/skins/currencies/F.E or O.E status, screenshots/video, price expectation, and remove 2FA/recovery phone/recovery email before final transfer.
 - First/Original Email means the first email used to create the Riot account. Search for "Welcome to Riot Games" or first Riot email.
 - Account buyers should provide game, server, budget, rank/badges, skins/champions desired. Do not claim available stock unless known.
@@ -724,7 +729,9 @@ export class AgentService {
       'credentials',
       'order_completed_review',
       'order_details_received',
-      'account_sell'
+      'account_sell',
+      'account_buy',
+      'account_form_help'
     ];
     if (lockedIntents.includes(quickReply.intent)) return false;
     // Everything else can be rewritten by Gemini to avoid template-looking replies.
@@ -761,7 +768,7 @@ Write the final customer-facing reply only.`
         }
       ]);
       if (response && response !== AI_FALLBACK_REPLY && response !== GEMINI_MISSING_KEY_REPLY) {
-        return response;
+        return this.finalizeCustomerReply(response);
       }
     } catch (error) {
       this.deps.logger.warn({ err: error, conversationId: ctx.conversationId }, 'Quick reply humanization failed');
@@ -931,6 +938,13 @@ ${text}`;
       return 'تمام ❤️ كده الطلب واضح وجاهز للمراجعة. الأدمن هيأكد الدفع أو أي تفصيلة ناقصة ويبدأ التنفيذ.';
     }
 
+    if (
+      /الفورم|فورم|thenexus\.ink|title|description|first email|2fa|recovery/i.test(normalizedCustomer) &&
+      /wild rift|كورز|cores|league rp|valorant/i.test(reply)
+    ) {
+      reply = 'ولا يهمك ❤️ الفورم خاص بعرض الأكونت. اكتب اللي تعرفه من اللعبة، السيرفر، الرانك، عدد السكينات، السعر، وارفع صور واضحة. لو خانة معينة مش فاهمها ابعت اسمها وأنا أشرحها لك.';
+    }
+
     const isWildRiftContext = memory.detectedGame === 'wild_rift' || pending.game === 'wild_rift';
     if (isWildRiftContext && /كور|cores|core/.test(normalizedCustomer) && /كورز ولا سكن|سكن ولا كورز|cores ولا/i.test(reply)) {
       if (/10\s*(k|الف|الاف|ألف|آلاف|تلاف)|10000/.test(normalizedCustomer)) {
@@ -946,7 +960,31 @@ ${text}`;
 لو تحب أكمل باقي التفاصيل ابعتلي "كمل" ❤️`;
     }
 
-    return reply;
+    return this.finalizeCustomerReply(reply);
+  }
+
+  private finalizeCustomerReply(reply: string) {
+    let finalReply = reply
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^\s*(?:\d+[.)]|[-*])\s+/gm, '- ')
+      .trim();
+
+    const questionMatches = [...finalReply.matchAll(/[؟?]/g)];
+    if (questionMatches.length > 1) {
+      const keepUntil = questionMatches[0].index! + 1;
+      finalReply = finalReply.slice(0, keepUntil).trim();
+    }
+
+    const lines = finalReply.split('\n');
+    if (lines.length > 12) {
+      finalReply = `${lines.slice(0, 10).join('\n').trim()}\n\nلو محتاج تفاصيل أكتر ابعتلي "كمل" ❤️`;
+    }
+
+    if (finalReply.length > 900) {
+      finalReply = `${finalReply.slice(0, 850).trim()}\n\nلو محتاج أكمل ابعتلي "كمل" ❤️`;
+    }
+
+    return finalReply;
   }
 
   private async getRecentMessages(conversationId: string, take: number): Promise<ChatMessage[]> {
