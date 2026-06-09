@@ -606,8 +606,8 @@ export class AgentService {
     }
 
     const lastOutbound = await this.getLastOutboundMessage(args.conversationId);
-    if (!clearIntent && !inOpenFlow) {
-      return 'no_clear_business_intent';
+    if (!clearIntent) {
+      return inOpenFlow ? 'open_flow_no_actionable_intent' : 'no_clear_business_intent';
     }
 
     if (await this.isAutoReplyBudgetExceeded(args.conversationId, args.settings, args.quickReply, args.memory)) {

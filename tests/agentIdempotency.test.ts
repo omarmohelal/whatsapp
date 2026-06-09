@@ -211,6 +211,64 @@ describe('agent idempotency', () => {
     expect(ai.createChatCompletion).not.toHaveBeenCalled();
   });
 
+  it('stays silent for side chatter inside an open flow', async () => {
+    const prisma = {
+      business: { upsert: jest.fn().mockResolvedValue({ id: 'business-id', slug: 'thenexus' }) },
+      contact: { upsert: jest.fn().mockResolvedValue({ id: 'contact-id' }) },
+      conversation: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        update: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'conversation-id',
+          handoffStatus: 'NONE',
+          aiEnabled: true,
+          lastIntent: 'payment_methods',
+          detectedGame: 'wild_rift',
+          lastAskedQuestion: 'payment_method',
+          pendingFields: {
+            game: 'wild_rift',
+            product: 'Wild Rift Keys',
+            package: '30 keys',
+            awaitingPaymentMethod: true
+          }
+        })
+      },
+      message: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'inbound-id', createdAt: new Date('2026-06-09T10:22:00.000Z') })
+      },
+      adminSetting: { findMany: jest.fn().mockResolvedValue([]) }
+    };
+    const whatsapp = { sendText: jest.fn(), sendImage: jest.fn() };
+    const ai = { createChatCompletion: jest.fn() };
+    const agent = new AgentService({
+      prisma: prisma as never,
+      whatsapp,
+      knowledge: {} as never,
+      mediaCatalog: { listActive: jest.fn().mockResolvedValue([]) } as never,
+      ai: ai as never,
+      env,
+      logger
+    });
+
+    await agent.handleIncomingMessage({
+      waId: '201000000000',
+      messageId: 'wamid.side-chatter',
+      text: 'فتحت اي؟',
+      type: 'text',
+      raw: {
+        id: 'wamid.side-chatter',
+        from: '201000000000',
+        type: 'text',
+        text: { body: 'فتحت اي؟' }
+      }
+    });
+
+    expect(whatsapp.sendText).not.toHaveBeenCalled();
+    expect(ai.createChatCompletion).not.toHaveBeenCalled();
+  });
+
   it('skips an older inbound message when a newer customer message arrived before reply generation', async () => {
     const inboundCreatedAt = new Date('2026-06-04T10:00:00.000Z');
     const prisma = {

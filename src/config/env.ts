@@ -19,6 +19,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().url().default(isTest ? 'redis://localhost:6379' : 'redis://redis:6379'),
   ADMIN_API_KEY: z.string().min(16).default(isTest ? 'test-admin-api-key-123456' : ''),
   ADMIN_NOTIFICATION_NUMBER: z.string().optional().default(''),
+  AUTO_REPLY_ENABLED: z.enum(['true', 'false']).optional(),
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).default(isTest ? 'verify-token' : ''),
   WHATSAPP_ACCESS_TOKEN: z.string().min(1).default(isTest ? 'wa-token' : ''),
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).default(isTest ? 'phone-id' : ''),

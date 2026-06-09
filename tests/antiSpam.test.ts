@@ -30,6 +30,7 @@ describe('anti-spam helpers', () => {
   it('detects clear purchase/payment intent for cooldown bypass', () => {
     expect(hasClearIntent('عايز اشحن وايلد', 'text')).toBe(true);
     expect(hasClearIntent('تم التحويل', 'text')).toBe(true);
+    expect(hasClearIntent('فتحت اي؟', 'text')).toBe(false);
     expect(hasClearIntent('تمام', 'text')).toBe(false);
     expect(hasClearIntent('', 'image')).toBe(false);
   });

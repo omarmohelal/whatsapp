@@ -46,8 +46,6 @@ const lowSignalSet = new Set(
 );
 
 const clearIntentKeywords = [
-  '؟',
-  '?',
   'عايز',
   'عاوز',
   'محتاج',
@@ -58,6 +56,8 @@ const clearIntentKeywords = [
   'كام',
   'ادفع',
   'دفع',
+  'متاح',
+  'المتاح',
   'فودافون',
   'انستا',
   'instapay',
@@ -140,9 +140,6 @@ export function isLowSignalText(text: string) {
 export function hasClearIntent(text: string, _type: string) {
   if (isShortAck(text)) {
     return false;
-  }
-  if (/[؟?]/.test(text)) {
-    return true;
   }
   const normalized = normalizeForIntent(text);
   return clearIntentKeywords.some((keyword) => {

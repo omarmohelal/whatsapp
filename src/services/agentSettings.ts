@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { env } from '../config/env';
 
 export interface AgentSettings {
   aiEnabled: boolean;
@@ -38,6 +39,10 @@ function boolValue(value: unknown, fallback: boolean) {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+function envKillSwitchAllowsAutoReply() {
+  return env.AUTO_REPLY_ENABLED !== 'false';
+}
+
 function stringValue(value: unknown, fallback: string) {
   return typeof value === 'string' ? value : fallback;
 }
@@ -59,7 +64,7 @@ export async function loadAgentSettings(
 
   return {
     aiEnabled: boolValue(map.get('aiEnabled'), DEFAULT_AGENT_SETTINGS.aiEnabled),
-    autoReplyEnabled: boolValue(map.get('autoReplyEnabled'), DEFAULT_AGENT_SETTINGS.autoReplyEnabled),
+    autoReplyEnabled: envKillSwitchAllowsAutoReply() && boolValue(map.get('autoReplyEnabled'), DEFAULT_AGENT_SETTINGS.autoReplyEnabled),
     cooldownSeconds: numberValue(map.get('cooldownSeconds'), DEFAULT_AGENT_SETTINGS.cooldownSeconds, 5, 40),
     replyDebounceSeconds: numberValue(
       map.get('replyDebounceSeconds'),
