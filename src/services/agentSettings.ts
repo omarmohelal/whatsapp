@@ -20,8 +20,8 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   aiEnabled: true,
   autoReplyEnabled: true,
   cooldownSeconds: 30,
-  replyDebounceSeconds: process.env.NODE_ENV === 'test' ? 0 : 4,
-  maxAutoRepliesPerTenMinutes: 3,
+  replyDebounceSeconds: process.env.NODE_ENV === 'test' ? 0 : 1,
+  maxAutoRepliesPerTenMinutes: 8,
   maxMessagesContext: 10,
   businessTonePrompt:
     'رد بالمصري، مختصر، محترم، ودود ومناسب للمبيعات. اسأل سؤال واحد بس لما تحتاج توضيح.',
@@ -70,7 +70,7 @@ export async function loadAgentSettings(
     maxAutoRepliesPerTenMinutes: numberValue(
       map.get('maxAutoRepliesPerTenMinutes'),
       DEFAULT_AGENT_SETTINGS.maxAutoRepliesPerTenMinutes,
-      1,
+      5,
       10
     ),
     maxMessagesContext: numberValue(

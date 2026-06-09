@@ -292,7 +292,7 @@ describe('agent idempotency', () => {
           .fn()
           .mockResolvedValueOnce(null)
           .mockResolvedValueOnce(null),
-        count: jest.fn().mockResolvedValue(3),
+        count: jest.fn().mockResolvedValue(8),
         create: jest.fn().mockResolvedValue({ id: 'inbound-id', createdAt: new Date('2026-06-04T10:00:00.000Z') })
       },
       adminSetting: { findMany: jest.fn().mockResolvedValue([]) }
@@ -323,5 +323,67 @@ describe('agent idempotency', () => {
 
     expect(prisma.message.count).toHaveBeenCalled();
     expect(whatsapp.sendText).not.toHaveBeenCalled();
+  });
+
+  it('does not budget-skip active sales flows like Wild Rift keys', async () => {
+    const prisma = {
+      business: { upsert: jest.fn().mockResolvedValue({ id: 'business-id', slug: 'thenexus' }) },
+      contact: { upsert: jest.fn().mockResolvedValue({ id: 'contact-id' }) },
+      conversation: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUnique: jest.fn().mockResolvedValue({ firstResponseAt: null }),
+        update: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'conversation-id',
+          handoffStatus: 'NONE',
+          aiEnabled: true,
+          lastIntent: null,
+          detectedGame: 'wild_rift',
+          lastAskedQuestion: null,
+          pendingFields: { game: 'wild_rift' }
+        })
+      },
+      message: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(8),
+        create: jest.fn()
+          .mockResolvedValueOnce({ id: 'inbound-id', createdAt: new Date('2026-06-09T07:54:58.000Z') })
+          .mockResolvedValueOnce({ id: 'outbound-id' })
+      },
+      adminSetting: { findMany: jest.fn().mockResolvedValue([]) }
+    };
+    const whatsapp = {
+      sendText: jest.fn().mockResolvedValue({ messageId: 'wamid.keys-out' }),
+      sendImage: jest.fn()
+    };
+    const agent = new AgentService({
+      prisma: prisma as never,
+      whatsapp,
+      knowledge: {} as never,
+      mediaCatalog: { listActive: jest.fn().mockResolvedValue([]) } as never,
+      ai: { createChatCompletion: jest.fn() } as never,
+      env,
+      logger
+    });
+
+    await agent.handleIncomingMessage({
+      waId: '905377859633',
+      messageId: 'wamid.keys',
+      text: 'عايز اشحن مفاتيح',
+      type: 'text',
+      raw: {
+        id: 'wamid.keys',
+        from: '905377859633',
+        type: 'text',
+        text: { body: 'عايز اشحن مفاتيح' }
+      }
+    });
+
+    expect(prisma.message.count).not.toHaveBeenCalled();
+    expect(whatsapp.sendText).toHaveBeenCalledWith(
+      '905377859633',
+      expect.stringContaining('Orange')
+    );
   });
 });

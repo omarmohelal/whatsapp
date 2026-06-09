@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(true);
   const [cooldownSeconds, setCooldownSeconds] = useState(30);
   const [replyDebounceSeconds, setReplyDebounceSeconds] = useState(4);
-  const [maxAutoRepliesPerTenMinutes, setMaxAutoRepliesPerTenMinutes] = useState(3);
+  const [maxAutoRepliesPerTenMinutes, setMaxAutoRepliesPerTenMinutes] = useState(8);
   const [maxMessagesContext, setMaxMessagesContext] = useState(10);
   const [businessTonePrompt, setBusinessTonePrompt] = useState(defaultTone);
   const [gamesServicesKnowledge, setGamesServicesKnowledge] = useState(defaultKnowledge);
@@ -67,7 +67,7 @@ export default function SettingsPage() {
         setAutoReplyEnabled(settings.autoReplyEnabled ?? true);
         setCooldownSeconds(settings.cooldownSeconds ?? 30);
         setReplyDebounceSeconds(settings.replyDebounceSeconds ?? 4);
-        setMaxAutoRepliesPerTenMinutes(settings.maxAutoRepliesPerTenMinutes ?? 3);
+        setMaxAutoRepliesPerTenMinutes(settings.maxAutoRepliesPerTenMinutes ?? 8);
         setMaxMessagesContext(settings.maxMessagesContext ?? 10);
         setBusinessTonePrompt(settings.businessTonePrompt ?? defaultTone);
         setGamesServicesKnowledge(settings.gamesServicesKnowledge ?? defaultKnowledge);
@@ -194,7 +194,7 @@ export default function SettingsPage() {
               Max auto replies / 10 min
               <input
                 type="number"
-                min={1}
+                min={5}
                 max={10}
                 className="mt-1 w-full rounded-md border border-nexus-line bg-black/20 p-2"
                 value={maxAutoRepliesPerTenMinutes}

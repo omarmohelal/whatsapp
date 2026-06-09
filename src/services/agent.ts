@@ -610,7 +610,7 @@ export class AgentService {
       return 'no_clear_business_intent';
     }
 
-    if (await this.isAutoReplyBudgetExceeded(args.conversationId, args.settings, args.quickReply)) {
+    if (await this.isAutoReplyBudgetExceeded(args.conversationId, args.settings, args.quickReply, args.memory)) {
       return 'auto_reply_budget_exceeded';
     }
 
@@ -628,11 +628,41 @@ export class AgentService {
   private async isAutoReplyBudgetExceeded(
     conversationId: string,
     settings: AgentSettings,
-    quickReply: QuickReplyResult
+    quickReply: QuickReplyResult,
+    memory: ConversationMemory
   ) {
+    const inOpenFlow = Boolean(
+      memory.lastAskedQuestion ||
+        memory.pendingFields?.awaitingPaymentMethod ||
+        memory.pendingFields?.awaitingPaymentProof ||
+        memory.pendingFields?.flow ||
+        memory.pendingFields?.game ||
+        memory.pendingFields?.product
+    );
     const criticalIntents = [
       'credentials',
       'human_handoff',
+      'specific_price',
+      'unknown_price',
+      'wild_rift_prices',
+      'league_rp_prices',
+      'valorant_prices',
+      'price_image_already_sent',
+      'price_game_missing',
+      'wild_rift_intake',
+      'wild_rift_game_only',
+      'wild_rift_cores_intake',
+      'wild_rift_gift',
+      'wild_rift_gift_accounts',
+      'league_intake',
+      'league_skin_gift',
+      'valorant_intake',
+      'mythic_orange_keys',
+      'wild_rift_keys_purchase',
+      'thirty_keys_clarification',
+      'giveaway_keys',
+      'giveaway_username_received',
+      'order_details_received',
       'payment_methods',
       'payment_instapay',
       'payment_vodafone',
@@ -642,7 +672,13 @@ export class AgentService {
       'delivery_delay',
       'order_completed_review'
     ];
-    if (quickReply.needsHuman || criticalIntents.includes(quickReply.intent)) {
+    if (
+      inOpenFlow ||
+      quickReply.needsHuman ||
+      quickReply.priceRequest ||
+      quickReply.agentGuidance ||
+      criticalIntents.includes(quickReply.intent)
+    ) {
       return false;
     }
 
@@ -741,6 +777,11 @@ export class AgentService {
       'payment_proof',
       'payment_proof_image',
       'credentials',
+      'mythic_orange_keys',
+      'wild_rift_keys_purchase',
+      'thirty_keys_clarification',
+      'giveaway_keys',
+      'giveaway_username_received',
       'order_completed_review',
       'order_details_received',
       'account_sell',

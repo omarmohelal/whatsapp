@@ -70,7 +70,7 @@ const settingsSchema = z.object({
   autoReplyEnabled: z.boolean().optional(),
   cooldownSeconds: z.number().int().min(5).max(40).optional(),
   replyDebounceSeconds: z.number().int().min(0).max(10).optional(),
-  maxAutoRepliesPerTenMinutes: z.number().int().min(1).max(10).optional(),
+  maxAutoRepliesPerTenMinutes: z.number().int().min(5).max(10).optional(),
   maxMessagesContext: z.number().int().min(4).max(20).optional(),
   businessTonePrompt: z.string().optional(),
   gamesServicesKnowledge: z.string().optional(),
