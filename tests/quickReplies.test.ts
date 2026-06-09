@@ -207,6 +207,60 @@ describe('smart deterministic routing before Gemini', () => {
     expect(reply.text).not.toContain('الجيفاوي');
   });
 
+  it('treats key top-up as normal keys, not mythic calculation', () => {
+    const reply = detectQuickReply('عايز اشحن مفاتيح', catalog, {
+      detectedGame: 'wild_rift'
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'wild_rift_keys_intake',
+      game: 'wild_rift',
+      lastAskedQuestion: 'wild_rift_key_amount'
+    });
+    expect(reply.text).toContain('كام مفتاح');
+    expect(reply.text).not.toContain('الميثك');
+    expect(reply.text).not.toContain('Orange');
+  });
+
+  it('prices key top-up when customer sends the key amount', () => {
+    const reply = detectQuickReply('30', catalog, {
+      detectedGame: 'wild_rift',
+      lastAskedQuestion: 'wild_rift_key_amount',
+      pendingFields: { flow: 'wild_rift_keys', game: 'wild_rift', product: 'Wild Rift Keys' }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'wild_rift_keys_purchase',
+      game: 'wild_rift',
+      priceRequest: true
+    });
+    expect(reply.text).toContain('30 مفتاح');
+    expect(reply.text).toContain('174 EGP');
+    expect(reply.text).not.toContain('Orange');
+  });
+
+  it('explains 30 keys instead of forcing giveaway clarification when customer asks what it is', () => {
+    const reply = detectQuickReply('ايه 30 مفتاح', catalog, {
+      detectedGame: 'wild_rift',
+      lastIntent: 'mythic_orange_keys',
+      pendingFields: { game: 'wild_rift', product: 'mythic_orange_keys' }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'keys_explanation',
+      game: 'wild_rift'
+    });
+    expect(reply.text).toContain('30 مفتاح');
+    expect(reply.text).toContain('174 EGP');
+    expect(reply.text).not.toContain('جيفاوي ولا شراء');
+  });
+
   it('handles a 30-key clarification follow-up as purchase', () => {
     const reply = detectQuickReply('شراء', catalog, {
       lastAskedQuestion: 'giveaway_or_purchase',
@@ -259,6 +313,62 @@ describe('smart deterministic routing before Gemini', () => {
       intent: 'mythic_orange_keys'
     });
     expect(reply.text).toContain('Orange');
+  });
+
+  it('understands current and required Orange from one message', () => {
+    const reply = detectQuickReply('معايا 500 وارنج الاسكن 400', catalog, {
+      detectedGame: 'wild_rift',
+      lastIntent: 'mythic_orange_keys',
+      pendingFields: { game: 'wild_rift', product: 'mythic_orange_keys' }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'mythic_orange_keys',
+      game: 'wild_rift',
+      lastAskedQuestion: 'skin_name_or_id'
+    });
+    expect(reply.text).toContain('كفاية');
+    expect(reply.text).not.toContain('InstaPay');
+    expect(reply.text).not.toContain('Vodafone');
+  });
+
+  it('uses a bare follow-up number as required Orange when current Orange is known', () => {
+    const reply = detectQuickReply('800', catalog, {
+      detectedGame: 'wild_rift',
+      lastIntent: 'mythic_orange_keys',
+      lastAskedQuestion: 'orange_amount',
+      pendingFields: { game: 'wild_rift', product: 'mythic_orange_keys', orangeCurrent: 500 }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'mythic_orange_keys',
+      game: 'wild_rift',
+      lastAskedQuestion: 'payment_method'
+    });
+    expect(reply.text).toContain('ناقصك 300 Orange');
+    expect(reply.text).toContain('1605 EGP');
+  });
+
+  it('lets customers correct a wrong Orange assumption without continuing the flow', () => {
+    const reply = detectQuickReply('انا مقولتش احسبلي حاجه', catalog, {
+      detectedGame: 'wild_rift',
+      lastIntent: 'mythic_orange_keys',
+      lastAskedQuestion: 'orange_amount',
+      pendingFields: { game: 'wild_rift', product: 'mythic_orange_keys' }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'flow_correction',
+      game: 'wild_rift',
+      lastAskedQuestion: 'wild_rift_service'
+    });
+    expect(reply.text).toContain('حقك عليا');
+    expect(reply.text).toContain('مفاتيح');
+    expect(reply.text).not.toContain('Orange');
+    expect(reply.pendingFields).toMatchObject({ game: 'wild_rift', flow: 'service_clarification' });
   });
 
   it('handles payment proof without asking to pay again', () => {
@@ -317,6 +427,54 @@ describe('smart deterministic routing before Gemini', () => {
     });
     expect(reply.text).toContain('سكرين الدفع بس');
     expect(reply.text).not.toContain('اسم اللعبة');
+  });
+
+  it('stores order details and payment method when they arrive in one message', () => {
+    const reply = detectQuickReply('ID: Ken#Lulu1 انستا باي', catalog, {
+      detectedGame: 'wild_rift',
+      lastAskedQuestion: 'skin_name_or_id',
+      pendingFields: { game: 'wild_rift', product: 'Epic Skin: Battle Dolphin Nami', total: '385 EGP' }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'order_details_received',
+      game: 'wild_rift',
+      lastAskedQuestion: 'payment_proof'
+    });
+    expect(reply.pendingFields).toMatchObject({
+      customerId: 'Ken#Lulu1',
+      paymentMethod: 'instapay',
+      orderDetailsComplete: true,
+      awaitingPaymentProof: true
+    });
+    expect(reply.text).toContain('01014094664');
+    expect(reply.text).toContain('سكرين الدفع بس');
+    expect(reply.text).not.toContain('تحب تدفع');
+  });
+
+  it('uses a shorter payment menu when an order is already waiting for payment', () => {
+    const reply = detectQuickReply('طرق الدفع', catalog, {
+      detectedGame: 'wild_rift',
+      lastAskedQuestion: 'payment_method',
+      pendingFields: {
+        game: 'wild_rift',
+        product: 'Wild Rift Keys',
+        package: '30 keys',
+        total: '174 EGP',
+        awaitingPaymentMethod: true
+      }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      intent: 'payment_methods',
+      lastAskedQuestion: 'payment_method'
+    });
+    expect(reply.text).toContain('اختار طريقة الدفع');
+    expect(reply.text).toContain('01014094664');
+    expect(reply.text).toContain('01007208978');
+    expect(reply.text).not.toContain('Payoneer');
   });
 
   it('treats payment screenshot as review-ready when order details are already known', () => {

@@ -122,15 +122,32 @@ const accountFormKeywords = [
 ];
 const giftKeywords = ['gift', 'جيفت', 'جفت', 'هدية', 'هديه', 'skin', 'skins', 'سكن', 'سكنات', 'اسكن', 'اسكين', 'سكنه', 'سكين'];
 const wildRiftCoreKeywords = ['core', 'cores', 'wild core', 'wild cores', 'كور', 'كورز', 'كورس', 'كوريز', 'ويلد كور'];
-const mythicKeywords = ['mythic', 'prestige', 'orange essence', 'orange', 'ميثك', 'برستيج', 'اورنج', 'مفاتيح', 'key', 'keys'];
+const mythicKeywords = ['mythic', 'prestige', 'orange essence', 'orange', 'ميثك', 'برستيج', 'اورنج', 'وارنج', 'ورنج'];
 const giveawayKeywords = ['جيفاوي', 'جيف اوي', 'جيف اواي', 'giveaway', 'هدية الجيفاوي', 'هديه الجيفاوي', 'هدية', 'هديه', 'مجاني', 'مجانا', 'free'];
 const giveawayKeyKeywords = ['مفتاح', 'مفاتيح', 'key', 'keys'];
 const keyPurchaseKeywords = ['اشتري', 'هشتري', 'شراء', 'عايز اشتري', 'عاوز اشتري', 'احجز', 'اوردر', 'طلب', 'سعر', 'بكام', 'price', 'cost'];
+const keyExplanationKeywords = ['ايه', 'يعني ايه', 'يعني اي', 'شرح', 'فهمني', 'وضحلي', 'what', 'explain'];
 const notAddedKeywords = ['مش مضاف', 'مش ضايف', 'ضيفكم', 'اضيف مين', 'add account', 'add accounts', 'add'];
 const topUpKeywords = ['شحن', 'اشحن', 'هشحن', 'عايز اشحن', 'عاوز اشحن', 'محتاج اشحن', 'اشتري', 'عايز اشتري', 'top up', 'charge'];
 const leagueGiftAskKeywords = ['هشحن جيفت', 'جيفت ليج', 'سكن ليج', 'league gift', 'league skin'];
 const confusionKeywords = ['مش عارف', 'مش فاهم', 'مش واضح', 'اعمل اي', 'ادوس فين', 'ازاي', 'اي المطلوب', 'يعني ايه', 'فهمني', 'وضحلي', 'مش فاهمك'];
 const unsupportedOrNoiseKeywords = ['كلام مش عارف', 'مش عايز ادوس', 'مش عارف يدوس'];
+const correctionKeywords = [
+  'مش كده',
+  'لا مش كده',
+  'مش قصدي',
+  'مش ده قصدي',
+  'مقولتش احسب',
+  'مقولتش احسبلي',
+  'انا مقولتش',
+  'مش عايز احسب',
+  'مش عايز حساب',
+  'مش ميثك',
+  'مش اورنج',
+  'مش وارنج',
+  'مش عايز ميثك',
+  'مش عايز اورنج'
+];
 
 function hasAny(text: string, keywords: string[]) {
   const normalized = normalizeForIntent(text);
@@ -309,12 +326,55 @@ function isOrangeContext(memory: ConversationMemory, pending: Record<string, unk
   return memory.lastAskedQuestion === 'orange_amount' || pending.product === 'mythic_orange_keys' || memory.lastIntent === 'mythic_orange_keys';
 }
 
+function hasOrangeCalculationIntent(text: string) {
+  return hasAny(text, mythicKeywords) || hasAny(text, ['orange essence', 'اورنج', 'وارنج', 'ورنج']);
+}
+
+function textAroundNumber(text: string, amount: number) {
+  const normalized = normalizeForIntent(normalizeDigits(text));
+  const index = normalized.indexOf(String(amount));
+  if (index < 0) return '';
+  return normalized.slice(Math.max(0, index - 28), index + String(amount).length + 28);
+}
+
+function extractOrangeAmounts(text: string, pending: Record<string, unknown>) {
+  const numbers = detectedNumbers(text);
+  const result: { current?: number; required?: number } = {};
+  const normalized = normalizeForIntent(text);
+
+  for (const number of numbers) {
+    const around = textAroundNumber(text, number);
+    const saysCurrentNear = hasAny(around, ['معايا', 'معي', 'عندي', 'معاك', 'عندك', 'رصيدي', 'حاليا', 'حاليًا']);
+    const saysRequiredNear = hasAny(around, ['محتاج', 'محتاجه', 'عايز', 'عاوزه', 'تكلف', 'يتطلب', 'لازم', 'الاسكن', 'السكن', 'skin']);
+    if (saysCurrentNear && result.current === undefined) result.current = number;
+    if (saysRequiredNear && result.required === undefined) result.required = number;
+  }
+
+  if (
+    numbers.length >= 2 &&
+    (result.current === undefined || result.required === undefined) &&
+    hasAny(normalized, ['معايا', 'معي', 'عندي', 'معاك', 'عندك']) &&
+    hasAny(normalized, ['الاسكن', 'السكن', 'skin', 'محتاج', 'محتاجه'])
+  ) {
+    result.current ??= numbers[0];
+    result.required ??= numbers[1];
+  }
+
+  if (numbers.length === 1) {
+    const [amount] = numbers;
+    if (typeof pending.orangeCurrent === 'number' && typeof pending.orangeRequired !== 'number') result.required ??= amount;
+    if (typeof pending.orangeRequired === 'number' && typeof pending.orangeCurrent !== 'number') result.current ??= amount;
+  }
+
+  return result;
+}
+
 function classifyOrangeNumber(text: string, pending: Record<string, unknown>) {
   const normalized = normalizeForIntent(text);
   const amount = extractOrangeIntentNumber(text);
   if (!amount) return { amount: undefined, kind: undefined as undefined | 'current' | 'required' };
 
-  const saysCurrent = hasAny(normalized, ['معايا', 'معي', 'عندي', 'معاك', 'عندك', 'رصيدي', 'اورنج معايا']);
+  const saysCurrent = hasAny(normalized, ['معايا', 'معي', 'عندي', 'معاك', 'عندك', 'رصيدي', 'اورنج معايا', 'وارنج معايا']);
   const saysRequired = hasAny(normalized, ['محتاج', 'عايز', 'تكلف', 'يتطلب', 'لازم', 'الاسكن ب', 'السكن ب', 'بيحتاج']);
   if (saysCurrent) return { amount, kind: 'current' as const };
   if (saysRequired) return { amount, kind: 'required' as const };
@@ -330,17 +390,33 @@ function classifyOrangeNumber(text: string, pending: Record<string, unknown>) {
 
 function orangeFlowReply(text: string, memory: ConversationMemory) {
   const pending = memory.pendingFields ?? {};
+  const extracted = extractOrangeAmounts(text, pending);
   const { amount, kind } = classifyOrangeNumber(text, pending);
   const next = pendingFields(pending, { game: 'wild_rift', product: 'mythic_orange_keys' });
 
-  if (amount && kind === 'current') next.orangeCurrent = amount;
-  if (amount && kind === 'required') next.orangeRequired = amount;
+  if (extracted.current !== undefined) next.orangeCurrent = extracted.current;
+  if (extracted.required !== undefined) next.orangeRequired = extracted.required;
+  if (extracted.current === undefined && extracted.required === undefined) {
+    if (amount && kind === 'current') next.orangeCurrent = amount;
+    if (amount && kind === 'required') next.orangeRequired = amount;
+  }
 
   const current = typeof next.orangeCurrent === 'number' ? next.orangeCurrent : undefined;
   const required = typeof next.orangeRequired === 'number' ? next.orangeRequired : undefined;
 
   if (current !== undefined && required !== undefined) {
     const missing = Math.max(0, required - current);
+    if (missing <= 0) {
+      return {
+        text: orangeCostText(missing),
+        pendingFields: pendingFields(next, {
+          orangeMissing: 0,
+          awaitingPaymentMethod: false,
+          product: 'mythic_orange_keys'
+        }),
+        lastAskedQuestion: 'skin_name_or_id'
+      };
+    }
     return {
       text: `${orangeCostText(missing)}\nابعت اسم السكن أو صورته، ولو تمام اختار طريقة الدفع: InstaPay ولا Vodafone Cash؟`,
       pendingFields: pendingFields(next, {
@@ -369,7 +445,7 @@ function orangeFlowReply(text: string, memory: ConversationMemory) {
   }
 
   return {
-    text: 'تمام ❤️ عشان أحسب الميثك صح ابعتلي حاجتين: معاك كام Orange حاليًا؟ والسكن محتاج كام Orange إجماليًا؟',
+    text: 'تمام ❤️ لو بتحسب سكن Mythic/Prestige ابعتلي معاك كام Orange حاليًا، وبعدها هسألك السكن محتاج كام.',
     pendingFields: next,
     lastAskedQuestion: 'orange_amount'
   };
@@ -386,7 +462,10 @@ function extractCustomerId(text: string) {
   const match = text.match(/(?:^|\n|\s)(?:riot\s*id|id|username|user|يوزر|ايدي|اي دي)\s*[:：-]?\s*([^\n]+)/i);
   const value = cleanOrderValue(match?.[1]);
   if (!value || value.length < 2) return undefined;
-  return value.replace(/^(هو|هي|ده|دي)\s+/i, '').trim();
+  return value
+    .replace(/^(هو|هي|ده|دي)\s+/i, '')
+    .replace(/\s+(?:instapay|انستا\s*باي|انستاباي|vodafone(?:\s*cash)?|فودافون(?:\s*كاش)?)\s*$/i, '')
+    .trim();
 }
 
 function extractAccountName(text: string) {
@@ -433,6 +512,14 @@ function hasCompleteOrderFields(fields: Record<string, unknown>) {
   const hasRequestedItem = Boolean(fields.package || fields.product || fields.skinName || fields.service);
   const hasCustomerReference = Boolean(fields.customerId || fields.username || fields.riotId || fields.accountName || fields.phone);
   return hasGameOrService && hasRequestedItem && hasCustomerReference;
+}
+
+function hasOrderDetailSignal(text: string) {
+  return Boolean(
+    extractCustomerId(text) ||
+      extractAccountName(text) ||
+      extractPhone(text)
+  );
 }
 
 function detectOrderDetails(text: string, memory: ConversationMemory, game?: DetectedGame) {
@@ -501,8 +588,14 @@ function orderDetailsReply(fields: Record<string, unknown>) {
   const hasPaymentMethod = Boolean(fields.paymentMethod);
 
   if (complete && hasPaymentMethod) {
+    const methodLine =
+      fields.paymentMethod === 'instapay'
+        ? 'InstaPay على: 01014094664'
+        : fields.paymentMethod === 'vodafone_cash'
+          ? 'Vodafone Cash على: 01007208978'
+          : 'طريقة الدفع اتسجلت.';
     return {
-      text: 'تمام ❤️ كده بيانات الطلب واضحة. بعد التحويل ابعت سكرين الدفع بس، والأدمن هيأكد ويبدأ التنفيذ.',
+      text: `تمام ❤️ كده بيانات الطلب واضحة.\n${methodLine}\nبعد التحويل ابعت سكرين الدفع بس، والأدمن هيأكد ويبدأ التنفيذ.`,
       lastAskedQuestion: 'payment_proof'
     };
   }
@@ -567,6 +660,49 @@ function pendingHelpReply(memory: ConversationMemory) {
 
 function isGenericConfusion(text: string) {
   return hasAny(text, confusionKeywords) || hasAny(text, unsupportedOrNoiseKeywords);
+}
+
+function isFlowCorrection(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const hasActiveFlow = Boolean(memory.lastAskedQuestion || memory.lastIntent || pending.flow || pending.product || pending.package);
+  return hasActiveFlow && hasAny(text, correctionKeywords);
+}
+
+function flowCorrectionReply(memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const game = normalizeMemoryGame(String(pending.game ?? memory.detectedGame ?? ''));
+  if (game === 'wild_rift') {
+    return {
+      text: 'حقك عليا ❤️ قولي عايز تعمل إيه في Wild Rift بالظبط: كورز، مفاتيح، ولا سكن؟',
+      pendingFields: { game: 'wild_rift', flow: 'service_clarification' },
+      lastAskedQuestion: 'wild_rift_service'
+    };
+  }
+  if (game === 'league') {
+    return {
+      text: 'حقك عليا ❤️ تقصد RP ولا Skin/Gift في League؟',
+      pendingFields: { game: 'league', flow: 'service_clarification' },
+      lastAskedQuestion: 'league_service'
+    };
+  }
+  return {
+    text: 'حقك عليا ❤️ قولي الخدمة اللي محتاجها بالظبط وأنا أظبطهالك.',
+    pendingFields: { flow: 'service_clarification' },
+    lastAskedQuestion: 'service'
+  };
+}
+
+function contextualPaymentMethodsReply(memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const hasActiveOrder = Boolean(pending.awaitingPaymentMethod || pending.package || pending.product || pending.total || memory.lastAskedQuestion === 'payment_method');
+  if (!hasActiveOrder) return PAYMENT_METHODS_REPLY;
+  return `تمام ❤️ اختار طريقة الدفع:
+
+- InstaPay: 01014094664
+- Vodafone Cash: 01007208978
+
+لو PayPal / Crypto / كارت، الأدمن يبعتلك التفاصيل.
+بعد التحويل ابعت سكرين الدفع بس.`;
 }
 
 function isAccountFormHelpRequest(text: string, memory: ConversationMemory) {
@@ -698,6 +834,7 @@ function hasThirtyKeyPurchaseContext(text: string, memory: ConversationMemory) {
   const pending = memory.pendingFields ?? {};
   return (
     hasAny(text, keyPurchaseKeywords) ||
+    hasAny(text, topUpKeywords) ||
     memory.lastIntent === 'wild_rift_keys_purchase' ||
     pending.flow === 'thirty_keys_purchase'
   );
@@ -712,12 +849,17 @@ function isThirtyKeyPurchase(text: string, memory: ConversationMemory) {
 }
 
 function isThirtyKeyClarification(text: string, memory: ConversationMemory) {
+  if (isThirtyKeyExplanationRequest(text)) return false;
   return mentionsThirtyKeys(text) && !hasThirtyKeyGiveawayContext(text, memory) && !hasThirtyKeyPurchaseContext(text, memory);
 }
 
 function isThirtyKeyClarificationPending(memory: ConversationMemory) {
   const pending = memory.pendingFields ?? {};
   return memory.lastAskedQuestion === 'giveaway_or_purchase' || pending.flow === 'thirty_keys_clarification';
+}
+
+function isThirtyKeyExplanationRequest(text: string) {
+  return mentionsThirtyKeys(text) && hasAny(text, keyExplanationKeywords);
 }
 
 function thirtyKeyPurchaseTotal() {
@@ -736,6 +878,72 @@ function thirtyKeyPurchaseReply() {
 function thirtyKeyPurchaseTotalText() {
   const total = thirtyKeyPurchaseTotal();
   return total ? `${total} EGP` : undefined;
+}
+
+function keyExplanationReply() {
+  const total = thirtyKeyPurchaseTotal();
+  const price = total ? `لو شراء، 30 مفتاح سعرهم ${total} EGP حسب السعر الحالي.` : 'لو شراء، السعر محتاج تأكيد من الأدمن.';
+  return `الـ 30 مفتاح يعني 30 Key في Wild Rift ❤️\n${price}\nلو قصدك هدية الجيفاوي قولّي "الجيفاوي"، ولو عايز تشتريهم قولّي "شراء".`;
+}
+
+function keyAmountFromText(text: string) {
+  return detectedNumbers(text).sort((a, b) => b - a)[0];
+}
+
+function isKeyFlowContext(memory: ConversationMemory, pending: Record<string, unknown>) {
+  return (
+    memory.lastAskedQuestion === 'wild_rift_key_amount' ||
+    memory.lastIntent === 'wild_rift_keys_intake' ||
+    memory.lastIntent === 'wild_rift_keys_purchase' ||
+    pending.product === 'Wild Rift Keys' ||
+    pending.flow === 'wild_rift_keys'
+  );
+}
+
+function isKeyTopUpRequest(text: string, memory: ConversationMemory, pending: Record<string, unknown>) {
+  const hasKeyWord = hasAny(text, giveawayKeyKeywords);
+  const explicitKeyOrder = hasKeyWord && (hasAny(text, topUpKeywords) || hasAny(text, keyPurchaseKeywords) || hasAny(text, priceKeywords));
+  const keyFollowUpNumber = isKeyFlowContext(memory, pending) && detectedNumbers(text).length > 0;
+  return (explicitKeyOrder || keyFollowUpNumber || (hasKeyWord && isKeyFlowContext(memory, pending))) && !hasOrangeCalculationIntent(text);
+}
+
+function keyTopUpReply(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const amount = keyAmountFromText(text);
+  const next = pendingFields(pending, { flow: 'wild_rift_keys', game: 'wild_rift', product: 'Wild Rift Keys' });
+
+  if (!amount) {
+    return {
+      text: 'تمام ❤️ محتاج تشحن كام مفتاح؟',
+      pendingFields: next,
+      lastAskedQuestion: 'wild_rift_key_amount',
+      priceRequest: false
+    };
+  }
+
+  const tier = getKeyTierPrice(amount);
+  if (!tier) {
+    return {
+      text: `تمام ❤️ ${amount} مفتاح كمية كبيرة، هخلي الأدمن يأكد السعر النهائي قبل الدفع عشان منديكش رقم غلط.`,
+      pendingFields: pendingFields(next, { package: `${amount} keys`, needsPriceReview: true }),
+      lastAskedQuestion: 'human_pricing',
+      priceRequest: true,
+      needsHuman: true,
+      handoffReason: 'key_bulk_pricing'
+    };
+  }
+
+  const total = Math.round(amount * tier.pricePerKey);
+  return {
+    text: `تمام ❤️ ${amount} مفتاح سعرهم حوالي ${total} EGP حسب سعر المفاتيح الحالي.\nتحب تدفع InstaPay ولا Vodafone Cash؟`,
+    pendingFields: pendingFields(next, {
+      package: `${amount} keys`,
+      total: `${total} EGP`,
+      awaitingPaymentMethod: true
+    }),
+    lastAskedQuestion: 'payment_method',
+    priceRequest: true
+  };
 }
 
 function isGiveawayUsernameFollowup(text: string, memory: ConversationMemory) {
@@ -838,6 +1046,20 @@ export function detectQuickReply(
     });
   }
 
+  if (isThirtyKeyExplanationRequest(text)) {
+    return textResult({
+      text: keyExplanationReply(),
+      intent: 'keys_explanation',
+      game: 'wild_rift',
+      lastAskedQuestion: 'wild_rift_key_amount',
+      pendingFields: pendingFields(pending, {
+        flow: 'wild_rift_keys',
+        game: 'wild_rift',
+        product: 'Wild Rift Keys'
+      })
+    });
+  }
+
   if (
     isThirtyKeyPurchase(text, memory) ||
     (isThirtyKeyClarificationPending(memory) && hasThirtyKeyPurchaseContext(text, memory) && !hasThirtyKeyGiveawayContext(text, memory))
@@ -886,6 +1108,31 @@ export function detectQuickReply(
         awaitingUsername: false,
         usernameReceived: true
       })
+    });
+  }
+
+  if (isKeyTopUpRequest(text, memory, pending)) {
+    const keyReply = keyTopUpReply(text, memory);
+    return textResult({
+      text: keyReply.text,
+      intent: keyReply.priceRequest ? 'wild_rift_keys_purchase' : 'wild_rift_keys_intake',
+      game: 'wild_rift',
+      priceRequest: keyReply.priceRequest,
+      lastAskedQuestion: keyReply.lastAskedQuestion,
+      pendingFields: keyReply.pendingFields,
+      needsHuman: keyReply.needsHuman,
+      handoffReason: keyReply.handoffReason
+    });
+  }
+
+  if (isFlowCorrection(text, memory)) {
+    const correction = flowCorrectionReply(memory);
+    return textResult({
+      text: correction.text,
+      intent: 'flow_correction',
+      game: game ?? memoryGame,
+      lastAskedQuestion: correction.lastAskedQuestion,
+      pendingFields: correction.pendingFields
     });
   }
 
@@ -951,6 +1198,18 @@ export function detectQuickReply(
     });
   }
 
+  const earlyOrderDetails = detectOrderDetails(text, memory, game);
+  if (earlyOrderDetails && hasOrderDetailSignal(text)) {
+    const reply = orderDetailsReply(earlyOrderDetails);
+    return textResult({
+      text: reply.text,
+      intent: 'order_details_received',
+      game: game ?? memoryGame,
+      lastAskedQuestion: reply.lastAskedQuestion,
+      pendingFields: earlyOrderDetails
+    });
+  }
+
   if (isLikelyPaymentProof(text, memory)) {
     return textResult({
       text: hasOrderDetails(memory)
@@ -1000,7 +1259,7 @@ export function detectQuickReply(
 
   if (hasAny(text, paymentKeywords)) {
     return textResult({
-      text: PAYMENT_METHODS_REPLY,
+      text: contextualPaymentMethodsReply(memory),
       intent: 'payment_methods',
       game,
       lastAskedQuestion: 'payment_method',

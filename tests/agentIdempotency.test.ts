@@ -383,7 +383,7 @@ describe('agent idempotency', () => {
     expect(prisma.message.count).not.toHaveBeenCalled();
     expect(whatsapp.sendText).toHaveBeenCalledWith(
       '905377859633',
-      expect.stringContaining('Orange')
+      expect.stringContaining('كام مفتاح')
     );
   });
 });
