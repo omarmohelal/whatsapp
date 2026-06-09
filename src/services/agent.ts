@@ -61,6 +61,7 @@ Core behavior:
 - If the conversation already contains the game/service, requested item, customer ID/username, and payment method or proof, treat it as an active order ready for admin review. Do not ask for the same order details again.
 - If the customer sends "تم التحويل", payment screenshot, or a payment receipt after order details are known, acknowledge review and handoff; never ask them to pay again or resend known fields.
 - If the user chose a game/service/package, move forward to the next single step.
+- When internal routing guidance is provided, use it as facts and direction, not as a script. Write a fresh natural reply for this customer.
 - Ask ONE missing detail at a time. Never stack five questions. If the customer already gave an amount/item, do not ask what service they want again; continue to price/payment/order details.
 - Never ask more than one question mark in a reply. If multiple details are needed, ask for the most important next one only.
 - If the customer message is just an acknowledgement (تمام/اوكي/ماشي) and there is no pending question, stay silent. If there is a pending question, answer only the next logical step.
@@ -307,21 +308,35 @@ export class AgentService {
     }
 
     const intent = classifyIntent(text);
+    const routedIntent = quickReply.intent !== 'general' ? quickReply.intent : intent.name;
+    const routedGame = quickReply.game ?? intent.entities.game;
+    const routedMemory: ConversationMemory = {
+      ...conversationMemory,
+      lastIntent: routedIntent,
+      detectedGame: routedGame ?? conversationMemory.detectedGame,
+      lastAskedQuestion: quickReply.lastAskedQuestion ?? conversationMemory.lastAskedQuestion,
+      pendingFields: quickReply.pendingFields ?? conversationMemory.pendingFields
+    };
     this.deps.logger.info(
       {
         messageId: input.messageId,
         conversationId: conversation.id,
-        intent: intent.name,
+        intent: routedIntent,
+        classifierIntent: intent.name,
+        routingIntent: quickReply.intent,
         confidence: intent.confidence,
-        game: intent.entities.game,
-        priceRequest: intent.entities.asksForPrice,
+        game: routedGame,
+        priceRequest: quickReply.priceRequest || intent.entities.asksForPrice,
+        hasAgentGuidance: Boolean(quickReply.agentGuidance),
         selectedHandler: 'ai'
       },
       'Selected intent'
     );
     await this.updateConversationMemory(ctx.conversationId, {
-      lastIntent: intent.name,
-      detectedGame: intent.entities.game
+      lastIntent: routedIntent,
+      detectedGame: routedGame,
+      lastAskedQuestion: quickReply.lastAskedQuestion,
+      pendingFields: quickReply.pendingFields
     });
 
     const handoff = shouldHandoff({
@@ -341,7 +356,7 @@ export class AgentService {
       return;
     }
 
-    await this.handleRagAnswer(ctx, text, conversationMemory, settings);
+    await this.handleRagAnswer(ctx, text, routedMemory, settings, quickReply);
   }
 
   private async upsertWhatsAppPhone(businessId: string, input: IncomingWhatsAppJob) {
@@ -836,7 +851,8 @@ Write the final customer-facing reply only.`
     ctx: ConversationContext,
     text: string,
     memory: ConversationMemory,
-    settings: AgentSettings
+    settings: AgentSettings,
+    quickReply?: QuickReplyResult
   ) {
     if (!(process.env.GEMINI_API_KEY || this.deps.env.GEMINI_API_KEY)) {
       this.deps.logger.warn(
@@ -876,6 +892,22 @@ ${paymentMethods}
 
 Conversation memory:
 ${JSON.stringify(memory, null, 2)}
+
+Detected route:
+${JSON.stringify(
+  {
+    intent: quickReply?.intent ?? memory.lastIntent ?? 'general',
+    game: quickReply?.game ?? memory.detectedGame ?? null,
+    priceRequest: quickReply?.priceRequest ?? false,
+    lastAskedQuestion: quickReply?.lastAskedQuestion ?? memory.lastAskedQuestion ?? null,
+    responseMode: quickReply?.agentGuidance ? 'AI_GUIDED_NATURAL_REPLY' : 'AI_RAG_REPLY'
+  },
+  null,
+  2
+)}
+
+Internal routing guidance:
+${quickReply?.agentGuidance ?? 'No special deterministic guidance. Understand the latest message from context and reply naturally.'}
 
 Approved retrieved context:
 ${

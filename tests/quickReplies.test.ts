@@ -5,7 +5,6 @@ import {
   CREDENTIALS_REPLY,
   GIVEAWAY_KEYS_REPLY,
   GIVEAWAY_USERNAME_RECEIVED_REPLY,
-  LEAGUE_SKIN_GIFT_REPLY,
   PAYMENT_METHODS_REPLY,
   PAYMENT_PROOF_REPLY,
   THIRTY_KEYS_CLARIFY_REPLY
@@ -43,19 +42,20 @@ describe('smart deterministic routing before Gemini', () => {
     const reply = detectQuickReply('وايلد ريفت', catalog);
 
     expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'text',
+      matched: false,
+      responseType: 'ai',
       intent: 'wild_rift_game_only',
       game: 'wild_rift'
     });
-    expect(reply.text).toContain('كورز');
+    expect(reply.agentGuidance).toContain('Wild Rift');
     expect(reply.imageUrl).toBeUndefined();
   });
 
   it('does not send a Wild Rift price image for a generic top-up request', () => {
     const reply = detectQuickReply('عايز اشحن وايلد ريفت', catalog);
 
-    expect(reply.responseType).toBe('text');
+    expect(reply.responseType).toBe('ai');
+    expect(reply.agentGuidance).toContain('Wild Rift');
     expect(reply.imageUrl).toBeUndefined();
   });
 
@@ -99,11 +99,12 @@ describe('smart deterministic routing before Gemini', () => {
     const reply = detectQuickReply('عايز RP', catalog);
 
     expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'text',
+      matched: false,
+      responseType: 'ai',
       intent: 'league_intake',
       game: 'league'
     });
+    expect(reply.agentGuidance).toContain('League');
   });
 
   it('sends League RP image only for explicit price requests', () => {
@@ -121,23 +122,24 @@ describe('smart deterministic routing before Gemini', () => {
     const reply = detectQuickReply('عايز اشحن فالورانت', catalog);
 
     expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'text',
+      matched: false,
+      responseType: 'ai',
       intent: 'valorant_intake',
       game: 'valorant'
     });
+    expect(reply.agentGuidance).toContain('Valorant');
   });
 
-  it('asks League gift fields without sending TheNexus accounts', () => {
+  it('routes League gift to AI guidance without sending TheNexus accounts', () => {
     const reply = detectQuickReply('عايز skin gift في league', catalog);
 
     expect(reply).toMatchObject({
-      matched: true,
-      responseType: 'text',
-      intent: 'league_skin_gift',
-      text: LEAGUE_SKIN_GIFT_REPLY
+      matched: false,
+      responseType: 'ai',
+      intent: 'league_skin_gift'
     });
-    expect(reply.text).not.toContain('TheNexus#0001');
+    expect(reply.agentGuidance).toContain('League');
+    expect(reply.agentGuidance).not.toContain('TheNexus#0001');
   });
 
   it('sends Wild Rift gift accounts once when customer needs to add', () => {

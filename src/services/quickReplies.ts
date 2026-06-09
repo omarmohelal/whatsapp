@@ -47,6 +47,7 @@ export interface QuickReplyResult {
   handoffReason?: string;
   lastAskedQuestion?: string;
   pendingFields?: Record<string, unknown>;
+  agentGuidance?: string;
 }
 
 const imageFallbacks = {
@@ -175,6 +176,10 @@ function imageResult(args: Omit<QuickReplyResult, 'matched' | 'responseType'>) {
 
 function aiResult(intent = 'general', priceRequest = false): QuickReplyResult {
   return { matched: false, intent, priceRequest, responseType: 'ai' };
+}
+
+function aiGuidanceResult(args: Omit<QuickReplyResult, 'matched' | 'responseType' | 'priceRequest'> & { priceRequest?: boolean }) {
+  return { matched: false, responseType: 'ai' as const, priceRequest: args.priceRequest ?? false, ...args };
 }
 
 function handoffResult(args: Omit<QuickReplyResult, 'matched' | 'responseType' | 'priceRequest'>) {
@@ -894,12 +899,13 @@ export function detectQuickReply(
   }
 
   if (isGiftExplanationRequest(text, memory)) {
-    return textResult({
-      text: game === 'league' || memory.detectedGame === 'league'
-        ? 'تمام ❤️ الـ Gift في League يعني السكن بيتبعت هدية من أكونت عندنا لأكونتك. المطلوب: Riot ID + السيرفر + اسم السكن. بعد ما تضيفنا صديق ونقبلك، Riot بتفرض انتظار 7 أيام قبل إرسال الهدية.'
-        : 'تمام ❤️ الـ Gift/Skin يعني السكن بيتبعت لك على أكونتك عن طريق أكونتات TheNexus أو حسب طريقة اللعبة. ابعت اسم السكن أو صورته + الـ ID، ولو محتاج تضيفنا اكتب “ابعت أكونتات الإضافة”.',
+    return aiGuidanceResult({
+      agentGuidance: game === 'league' || memory.detectedGame === 'league'
+        ? 'Explain League gift naturally: skin/gift is sent from our account to customer account. Ask for Riot ID + server + skin/gift name if missing. Mention 7 days after friend add acceptance. Keep it short and do not send add accounts unless asked.'
+        : 'Explain Wild Rift/Riot gift naturally. Ask for skin name or screenshot + ID if missing. Tell customer to ask for add accounts only if they need to add us. Keep it short.',
       intent: 'gift_explanation',
       game: game ?? memoryGame,
+      lastAskedQuestion: game === 'league' || memory.detectedGame === 'league' ? 'league_gift_details' : 'wild_rift_gift_details',
       pendingFields: pendingFields(pending, { product: 'gift_or_skin' })
     });
   }
@@ -1130,8 +1136,8 @@ export function detectQuickReply(
 
   // Asking to charge Wild Rift with no amount should ask one useful question, not a menu.
   if ((game === 'wild_rift' || memoryGame === 'wild_rift') && hasCoreIntent) {
-    return textResult({
-      text: 'تمام ❤️ Wild Rift Cores. ابعت عدد الكورز اللي محتاجه، ولو عايز الصورة اكتب “أسعار وايلد ريفت”.',
+    return aiGuidanceResult({
+      agentGuidance: 'Customer is asking about Wild Rift cores but did not give a clear known amount. Ask for the cores amount only. Do not ask for region. Mention they can ask for the price image if needed.',
       intent: 'wild_rift_cores_intake',
       game: 'wild_rift',
       lastAskedQuestion: 'wild_rift_core_amount',
@@ -1148,8 +1154,8 @@ export function detectQuickReply(
         pendingFields: pendingFields(pending, { game: 'wild_rift', product: 'gift_or_skin', riotGiftAccountsSent: true })
       });
     }
-    return textResult({
-      text: 'تمام ❤️ ابعت اسم السكن أو صورته + الـ ID. لو السكن Gift ومحتاج تضيفنا اكتبلي “ابعت أكونتات الإضافة”.',
+    return aiGuidanceResult({
+      agentGuidance: 'Customer wants a Wild Rift skin/gift. Ask for the skin name or screenshot and the customer ID. If they need to add us, tell them to ask for add accounts. Do not send add accounts unless explicitly needed.',
       intent: 'wild_rift_gift',
       game: 'wild_rift',
       lastAskedQuestion: 'wild_rift_gift_details',
@@ -1158,8 +1164,8 @@ export function detectQuickReply(
   }
 
   if (game === 'league' && hasGiftIntent) {
-    return textResult({
-      text: LEAGUE_SKIN_GIFT_REPLY,
+    return aiGuidanceResult({
+      agentGuidance: `Customer wants League skin/gift. Use these facts but write naturally, not as a fixed template:\n${LEAGUE_SKIN_GIFT_REPLY}`,
       intent: 'league_skin_gift',
       game: 'league',
       lastAskedQuestion: 'league_gift_details',
@@ -1194,8 +1200,8 @@ export function detectQuickReply(
   }
 
   if (game === 'wild_rift' && hasTopUpIntent) {
-    return textResult({
-      text: 'تمام ❤️ Wild Rift. ابعت عدد الكورز لو شحن، أو اسم/صورة السكن لو Gift/Skin، وأنا أحسبها لك مباشرة.',
+    return aiGuidanceResult({
+      agentGuidance: 'Customer wants Wild Rift service but the exact item is unclear. Ask one natural follow-up: cores amount if top-up, or skin/screenshot if gift/skin. Do not ask for region.',
       intent: 'wild_rift_intake',
       game: 'wild_rift',
       lastAskedQuestion: 'wild_rift_service',
@@ -1204,8 +1210,8 @@ export function detectQuickReply(
   }
 
   if (game === 'wild_rift' && isBareGameOnly(text)) {
-    return textResult({
-      text: 'Wild Rift تمام ❤️ محتاج كورز ولا سكن/جيفت؟ ابعت العدد أو اسم السكن مباشرة.',
+    return aiGuidanceResult({
+      agentGuidance: 'Customer only mentioned Wild Rift. Ask naturally whether they need cores, skin/gift, or account help. Keep it one short question and do not send a price image.',
       intent: 'wild_rift_game_only',
       game: 'wild_rift',
       lastAskedQuestion: 'wild_rift_service',
@@ -1214,8 +1220,8 @@ export function detectQuickReply(
   }
 
   if (game === 'league' && !priceRequest) {
-    return textResult({
-      text: 'تمام ❤️ League PC. لو RP ابعت الباقة والسيرفر، ولو Skin/Gift ابعت Riot ID + السيرفر + اسم السكن.',
+    return aiGuidanceResult({
+      agentGuidance: 'Customer is asking about League without explicit price request. Ask one useful next question: RP package/server if RP, or Riot ID/server/skin name if skin/gift. Mention RP is instant only if relevant.',
       intent: 'league_intake',
       game: 'league',
       lastAskedQuestion: 'league_service',
@@ -1224,8 +1230,8 @@ export function detectQuickReply(
   }
 
   if (game === 'valorant' && !priceRequest) {
-    return textResult({
-      text: 'تمام ❤️ Valorant VP. ابعت الريجون والباقة المطلوبة، أو اكتب “أسعار فالورانت” لو عايز الصورة.',
+    return aiGuidanceResult({
+      agentGuidance: 'Customer is asking about Valorant without explicit price request. Ask for region and VP package only. Mention they can ask for prices if they need the price image.',
       intent: 'valorant_intake',
       game: 'valorant',
       lastAskedQuestion: 'region_and_package',
@@ -1234,8 +1240,8 @@ export function detectQuickReply(
   }
 
   if (priceRequest && !game && !memoryGame) {
-    return textResult({
-      text: 'أسعار أي لعبة يا فندم؟ ❤️ ابعت اسم اللعبة بس، ولو Wild Rift / League / Valorant هبعتلك الأسعار فورًا.',
+    return aiGuidanceResult({
+      agentGuidance: 'Customer asks for prices but no game is known. Ask for the game name only. Mention Wild Rift, League, and Valorant only as examples, not as a long menu.',
       intent: 'price_game_missing',
       lastAskedQuestion: 'game_for_prices',
       pendingFields: pendingFields(pending, { awaitingGameForPrices: true })
