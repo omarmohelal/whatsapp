@@ -2,9 +2,13 @@ import {
   ACCOUNT_BUYING_REPLY,
   ACCOUNT_LISTING_REPLY,
   ACCOUNT_SELLING_HELP_REPLY,
+  CREDENTIALS_REPLY,
+  GIVEAWAY_KEYS_REPLY,
+  GIVEAWAY_USERNAME_RECEIVED_REPLY,
   LEAGUE_SKIN_GIFT_REPLY,
   PAYMENT_METHODS_REPLY,
-  PAYMENT_PROOF_REPLY
+  PAYMENT_PROOF_REPLY,
+  THIRTY_KEYS_CLARIFY_REPLY
 } from '../src/config/constants';
 import { env } from '../src/config/env';
 import { loadDefaultMediaCatalog } from '../src/services/mediaCatalog';
@@ -145,6 +149,104 @@ describe('smart deterministic routing before Gemini', () => {
 
     expect(first.text).toContain('TheNexus#0001');
     expect(second.text).not.toContain('TheNexus#0001');
+  });
+
+  it('routes 30-key giveaway away from orange pricing and payment', () => {
+    const reply = detectQuickReply('الـ 30 مفتاح دول بتوع الجيفاوي؟', catalog, {
+      detectedGame: 'wild_rift'
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'giveaway_keys',
+      game: 'wild_rift',
+      text: GIVEAWAY_KEYS_REPLY
+    });
+    expect(reply.text).toContain('ابعت اليوزر');
+    expect(reply.text).not.toContain('Orange');
+    expect(reply.text).not.toContain('InstaPay');
+    expect(reply.text).toContain('ترتيب الطلبات');
+  });
+
+  it('asks one clarification for ambiguous 30-key requests', () => {
+    const reply = detectQuickReply('عايز الـ 30 مفتاح', catalog, {
+      detectedGame: 'wild_rift'
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'thirty_keys_clarification',
+      game: 'wild_rift',
+      text: THIRTY_KEYS_CLARIFY_REPLY
+    });
+    expect(reply.text).toContain('جيفاوي');
+    expect(reply.text).toContain('شراء');
+    expect(reply.text).not.toContain('Orange');
+    expect(reply.text).not.toContain('InstaPay');
+  });
+
+  it('routes explicit 30-key purchase to the paid key flow', () => {
+    const reply = detectQuickReply('عايز اشتري 30 مفتاح', catalog, {
+      detectedGame: 'wild_rift'
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'wild_rift_keys_purchase',
+      game: 'wild_rift',
+      priceRequest: true,
+      lastAskedQuestion: 'payment_method'
+    });
+    expect(reply.text).toContain('174 EGP');
+    expect(reply.text).toContain('InstaPay');
+    expect(reply.text).not.toContain('الجيفاوي');
+  });
+
+  it('handles a 30-key clarification follow-up as purchase', () => {
+    const reply = detectQuickReply('شراء', catalog, {
+      lastAskedQuestion: 'giveaway_or_purchase',
+      pendingFields: { flow: 'thirty_keys_clarification', subject: '30_keys' }
+    });
+
+    expect(reply).toMatchObject({
+      intent: 'wild_rift_keys_purchase',
+      game: 'wild_rift'
+    });
+    expect(reply.text).toContain('174 EGP');
+  });
+
+  it('accepts giveaway username follow-up without asking for payment', () => {
+    const reply = detectQuickReply('AN 황 ELWEZA#ZOZ', catalog, {
+      lastAskedQuestion: 'giveaway_or_purchase',
+      pendingFields: { flow: 'thirty_keys_clarification', subject: '30_keys', awaitingGiveawayOrPurchase: true }
+    });
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'giveaway_username_received',
+      game: 'wild_rift',
+      text: GIVEAWAY_USERNAME_RECEIVED_REPLY
+    });
+    expect(reply.text).toContain('وصل اليوزر');
+    expect(reply.text).not.toContain('الدفع');
+  });
+
+  it('does not warn customers not to send passwords when credentials arrive', () => {
+    const reply = detectQuickReply('user test password abc123', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'handoff',
+      intent: 'credentials',
+      text: CREDENTIALS_REPLY,
+      sensitive: true
+    });
+    expect(reply.text).not.toContain('بلاش');
+    expect(reply.text).not.toContain('باسورد في الشات');
   });
 
   it('asks mythic/orange essence details before pricing', () => {

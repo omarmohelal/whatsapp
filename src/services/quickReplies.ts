@@ -4,6 +4,8 @@ import {
   ACCOUNT_SELLING_HELP_REPLY,
   CREDENTIALS_REPLY,
   FIRST_EMAIL_EXPLAIN_REPLY,
+  GIVEAWAY_KEYS_REPLY,
+  GIVEAWAY_USERNAME_RECEIVED_REPLY,
   HUMAN_HANDOFF_REPLY,
   LEAGUE_SKIN_GIFT_REPLY,
   ORDER_COMPLETED_REVIEW_REPLY,
@@ -11,6 +13,7 @@ import {
   PAYMENT_PROOF_REPLY,
   PRICE_SKUS,
   RIOT_GIFT_ADD_ACCOUNTS_REPLY,
+  THIRTY_KEYS_CLARIFY_REPLY,
   WILD_RIFT_CORE_PACKAGES,
   WILD_RIFT_KEY_TIERS,
   WILD_RIFT_SKIN_PRICES
@@ -119,6 +122,9 @@ const accountFormKeywords = [
 const giftKeywords = ['gift', 'جيفت', 'جفت', 'هدية', 'هديه', 'skin', 'skins', 'سكن', 'سكنات', 'اسكن', 'اسكين', 'سكنه', 'سكين'];
 const wildRiftCoreKeywords = ['core', 'cores', 'wild core', 'wild cores', 'كور', 'كورز', 'كورس', 'كوريز', 'ويلد كور'];
 const mythicKeywords = ['mythic', 'prestige', 'orange essence', 'orange', 'ميثك', 'برستيج', 'اورنج', 'مفاتيح', 'key', 'keys'];
+const giveawayKeywords = ['جيفاوي', 'جيف اوي', 'جيف اواي', 'giveaway', 'هدية الجيفاوي', 'هديه الجيفاوي', 'هدية', 'هديه', 'مجاني', 'مجانا', 'free'];
+const giveawayKeyKeywords = ['مفتاح', 'مفاتيح', 'key', 'keys'];
+const keyPurchaseKeywords = ['اشتري', 'هشتري', 'شراء', 'عايز اشتري', 'عاوز اشتري', 'احجز', 'اوردر', 'طلب', 'سعر', 'بكام', 'price', 'cost'];
 const notAddedKeywords = ['مش مضاف', 'مش ضايف', 'ضيفكم', 'اضيف مين', 'add account', 'add accounts', 'add'];
 const topUpKeywords = ['شحن', 'اشحن', 'هشحن', 'عايز اشحن', 'عاوز اشحن', 'محتاج اشحن', 'اشتري', 'عايز اشتري', 'top up', 'charge'];
 const leagueGiftAskKeywords = ['هشحن جيفت', 'جيفت ليج', 'سكن ليج', 'league gift', 'league skin'];
@@ -669,6 +675,88 @@ function isLikelyPaymentProof(text: string, memory: ConversationMemory) {
   return /^(تم|خلصت|دفعت|حولت|بعت)$/i.test(normalizeForIntent(text));
 }
 
+function mentionsThirtyKeys(text: string) {
+  return detectedNumbers(text).includes(30) && hasAny(text, giveawayKeyKeywords);
+}
+
+function hasThirtyKeyGiveawayContext(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  return (
+    hasAny(text, giveawayKeywords) ||
+    memory.lastIntent === 'giveaway_keys' ||
+    pending.flow === 'giveaway_keys' ||
+    pending.giveaway === '30_keys'
+  );
+}
+
+function hasThirtyKeyPurchaseContext(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  return (
+    hasAny(text, keyPurchaseKeywords) ||
+    memory.lastIntent === 'wild_rift_keys_purchase' ||
+    pending.flow === 'thirty_keys_purchase'
+  );
+}
+
+function isThirtyKeyGiveaway(text: string, memory: ConversationMemory) {
+  return mentionsThirtyKeys(text) && hasThirtyKeyGiveawayContext(text, memory) && !hasThirtyKeyPurchaseContext(text, memory);
+}
+
+function isThirtyKeyPurchase(text: string, memory: ConversationMemory) {
+  return mentionsThirtyKeys(text) && hasThirtyKeyPurchaseContext(text, memory) && !hasThirtyKeyGiveawayContext(text, memory);
+}
+
+function isThirtyKeyClarification(text: string, memory: ConversationMemory) {
+  return mentionsThirtyKeys(text) && !hasThirtyKeyGiveawayContext(text, memory) && !hasThirtyKeyPurchaseContext(text, memory);
+}
+
+function isThirtyKeyClarificationPending(memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  return memory.lastAskedQuestion === 'giveaway_or_purchase' || pending.flow === 'thirty_keys_clarification';
+}
+
+function thirtyKeyPurchaseTotal() {
+  const tier = getKeyTierPrice(30);
+  return tier ? Math.round(30 * tier.pricePerKey) : undefined;
+}
+
+function thirtyKeyPurchaseReply() {
+  const total = thirtyKeyPurchaseTotal();
+  if (!total) {
+    return 'تمام ❤️ 30 مفتاح شراء. السعر محتاج تأكيد من الأدمن قبل الدفع.';
+  }
+  return `تمام ❤️ 30 مفتاح شراء سعرهم ${total} EGP حسب سعر المفاتيح الحالي.\nتحب تدفع InstaPay ولا Vodafone Cash؟`;
+}
+
+function thirtyKeyPurchaseTotalText() {
+  const total = thirtyKeyPurchaseTotal();
+  return total ? `${total} EGP` : undefined;
+}
+
+function isGiveawayUsernameFollowup(text: string, memory: ConversationMemory) {
+  const pending = memory.pendingFields ?? {};
+  const isGiveawayFlow =
+    memory.lastAskedQuestion === 'giveaway_username' ||
+    memory.lastAskedQuestion === 'giveaway_or_purchase' ||
+    pending.flow === 'giveaway_keys' ||
+    pending.flow === 'thirty_keys_clarification';
+  if (!isGiveawayFlow) return false;
+  if (
+    hasAny(text, giveawayKeyKeywords) ||
+    hasAny(text, paymentKeywords) ||
+    hasAny(text, priceKeywords) ||
+    hasAny(text, keyPurchaseKeywords) ||
+    isGenericConfusion(text)
+  ) {
+    return false;
+  }
+
+  const normalized = normalizeForIntent(text);
+  if (!normalized || normalized.length < 2 || normalized.length > 80) return false;
+  if (/^(تمام|اوكي|ماشي|ok|done|ty|شكرا|شكرًا)$/i.test(normalized)) return false;
+  return true;
+}
+
 export function detectQuickReply(
   text: string,
   mediaCatalog: MediaCatalogEntry[] = loadDefaultMediaCatalog(env),
@@ -724,6 +812,75 @@ export function detectQuickReply(
       intent: 'account_form_help',
       lastAskedQuestion: 'account_form',
       pendingFields: pendingFields(pending, { flow: 'account_sell', formHelpSent: true })
+    });
+  }
+
+  if (
+    isThirtyKeyGiveaway(text, memory) ||
+    (isThirtyKeyClarificationPending(memory) && hasThirtyKeyGiveawayContext(text, memory) && !hasThirtyKeyPurchaseContext(text, memory))
+  ) {
+    return textResult({
+      text: GIVEAWAY_KEYS_REPLY,
+      intent: 'giveaway_keys',
+      game: 'wild_rift',
+      lastAskedQuestion: 'giveaway_username',
+      pendingFields: pendingFields(pending, {
+        flow: 'giveaway_keys',
+        game: 'wild_rift',
+        giveaway: '30_keys',
+        awaitingUsername: true
+      })
+    });
+  }
+
+  if (
+    isThirtyKeyPurchase(text, memory) ||
+    (isThirtyKeyClarificationPending(memory) && hasThirtyKeyPurchaseContext(text, memory) && !hasThirtyKeyGiveawayContext(text, memory))
+  ) {
+    return textResult({
+      text: thirtyKeyPurchaseReply(),
+      intent: 'wild_rift_keys_purchase',
+      game: 'wild_rift',
+      priceRequest: true,
+      lastAskedQuestion: 'payment_method',
+      pendingFields: pendingFields(pending, {
+        flow: 'thirty_keys_purchase',
+        game: 'wild_rift',
+        product: 'Wild Rift Keys',
+        package: '30 keys',
+        total: thirtyKeyPurchaseTotalText(),
+        awaitingPaymentMethod: true
+      })
+    });
+  }
+
+  if (isThirtyKeyClarification(text, memory)) {
+    return textResult({
+      text: THIRTY_KEYS_CLARIFY_REPLY,
+      intent: 'thirty_keys_clarification',
+      game: 'wild_rift',
+      lastAskedQuestion: 'giveaway_or_purchase',
+      pendingFields: pendingFields(pending, {
+        flow: 'thirty_keys_clarification',
+        game: 'wild_rift',
+        subject: '30_keys',
+        awaitingGiveawayOrPurchase: true
+      })
+    });
+  }
+
+  if (isGiveawayUsernameFollowup(text, memory)) {
+    return textResult({
+      text: GIVEAWAY_USERNAME_RECEIVED_REPLY,
+      intent: 'giveaway_username_received',
+      game: 'wild_rift',
+      pendingFields: pendingFields(pending, {
+        flow: 'giveaway_keys',
+        game: 'wild_rift',
+        giveaway: '30_keys',
+        awaitingUsername: false,
+        usernameReceived: true
+      })
     });
   }
 

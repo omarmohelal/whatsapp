@@ -79,7 +79,7 @@ export const WILD_RIFT_PRICE_CAPTION_REPLIES = [
 export const WILD_RIFT_PACKAGE_CONFIRMATION_REPLIES = (packageName: string) => [
   `تمام ❤️ تم اختيار باقة ${packageName} لـ Wild Rift.\nالشحن بيتم على الأكونت، فهنحتاج طريقة دخول آمنة مع الأدمن:\n- Username + Password لو متاحين\n- أو الإيميل/فيسبوك/جوجل/أبل المربوط\n- أو Riot ID لو ده المتاح حاليًا`,
   `تمام ❤️ باقة ${packageName} جاهزة.\nعلشان نكمل شحن Wild Rift هنحوّل الطلب للأدمن يديك طريقة تسليم بيانات آمنة.`,
-  `حلو جدًا ❤️ اخترت ${packageName}.\nدلوقتي محتاجين طريقة دخول الأكونت، والأدمن هيكمل معاك بشكل آمن بدل إرسال أي باسورد في الشات.`
+  `حلو جدًا ❤️ اخترت ${packageName}.\nدلوقتي محتاجين بيانات الأكونت المناسبة للشحن، والأدمن هيكمل معاك التفاصيل.`
 ] as const;
 
 export const WILD_RIFT_ACCOUNT_INTRO_REPLIES = [
@@ -89,7 +89,7 @@ export const WILD_RIFT_ACCOUNT_INTRO_REPLIES = [
 ] as const;
 
 export const WILD_RIFT_HAVE_LOGIN_REPLY = `تمام ❤️ ممتاز.
-بلاش تبعت الباسورد في الشات. هحوّلك لأدمن يديك طريقة تسليم آمنة ومؤقتة، وبعد الشحن غيّر الباسورد تاني فورًا لحماية حسابك.`;
+الأدمن هيكمل معاك بيانات الدخول المطلوبة ويبدأ تنفيذ الطلب.`;
 
 export const RIOT_LINKS = {
   forgotUsername: 'https://recovery.riotgames.com/en/forgot-username',
@@ -206,9 +206,18 @@ export const INSTAPAY_PAYMENT_REPLIES = [
 ] as const;
 
 export const CREDENTIALS_REPLY =
-  'تمام، لأمانك بلاش تبعت أي باسورد في الشات ❤️ لو الطلب محتاج بيانات دخول هحوّلك لأدمن يديك طريقة تسليم آمنة ومؤقتة.';
+  'تمام ❤️ وصلت البيانات، الأدمن هيكمل معاك الطلب ويراجع التفاصيل.';
 
 export const HUMAN_HANDOFF_REPLY = 'تمام ❤️ الأدمن هيراجع معاك ويكمل التفاصيل بأمان.';
+
+export const GIVEAWAY_KEYS_REPLY = `تمام ❤️ الـ 30 مفتاح دول هدية الجيفاوي.
+ابعت اليوزر / Riot ID بتاعك، واستنى دورك، والمفاتيح هتوصلك حسب ترتيب الطلبات.`;
+
+export const GIVEAWAY_USERNAME_RECEIVED_REPLY =
+  'تمام ❤️ وصل اليوزر. خليك مستني دورك، والمفاتيح هتوصلك حسب ترتيب الجيفاوي.';
+
+export const THIRTY_KEYS_CLARIFY_REPLY =
+  'تقصد الـ 30 مفتاح هدية الجيفاوي ولا شراء 30 مفتاح؟ ❤️\nلو الجيفاوي ابعت اليوزر / Riot ID، ولو شراء قولّي وهنحسبها لك.';
 
 export const COMING_SOON_REPLY =
   'الخدمة دي لسه مش متاحة عندنا حاليًا ❤️ لكن هنضيفها قريب جدًا إن شاء الله. لو حابب أقدر أساعدك في Wild Rift أو League أو Valorant.';

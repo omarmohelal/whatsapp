@@ -112,7 +112,7 @@ const BUSINESS_RULES_CONTEXT = `Approved TheNexus business rules and exact knowl
 - Account sellers should include game/server/rank/level/skins/currencies/F.E or O.E status, screenshots/video, price expectation, and remove 2FA/recovery phone/recovery email before final transfer.
 - First/Original Email means the first email used to create the Riot account. Search for "Welcome to Riot Games" or first Riot email.
 - Account buyers should provide game, server, budget, rank/badges, skins/champions desired. Do not claim available stock unless known.
-- If customer sends username/password/email/recovery codes, do not store or repeat them; ask admin to handle secure temporary access.
+- If customer sends username/password/email/recovery codes, do not repeat the values in replies. Mark the conversation sensitive and let admin continue.
 - Group behavior: reply only to clear sales intent or mention. No periodic promos unless enabled.
 - Unknown game/item/price: never guess; ask for screenshot/name or say admin will confirm.
 - Avoid spam: do not send the same helper text twice in a row. If the last answer already asked for a missing detail, wait for that detail.`;

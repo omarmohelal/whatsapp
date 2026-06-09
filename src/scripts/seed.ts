@@ -88,10 +88,7 @@ If there is no clear match, mark the conversation as needs_human_sales and hand 
   },
   {
     title: 'Sensitive credential handling',
-    body: `If a customer sends Riot, Gmail, Facebook, Apple, or other login credentials, do not repeat passwords back. Mark the conversation as sensitive and hand off to admin.
-
-Prefer sending the secure form link:
-https://www.thenexus.ink/
+    body: `If a customer sends Riot, Gmail, Facebook, Apple, or other login credentials, do not repeat passwords back. Mark the conversation as sensitive and let admin continue.
 
 Sensitive data should be masked in logs and deleted after the configured TTL.`
   }

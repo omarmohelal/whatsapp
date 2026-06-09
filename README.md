@@ -283,8 +283,10 @@ npx prisma validate
 ## Production behavior update
 
 - `https://www.thenexus.ink/` is used for account-selling submissions only.
-- Normal top-up credentials are never requested in WhatsApp chat; sensitive access goes to admin handoff.
+- If customers send login details, the bot keeps them masked in logs and lets admin continue without repeating them back.
 - Specific known SKU prices can be answered in text. General price requests still send the pricing image.
 - Payment proof, delays, and complaints are routed to admin review.
 - Sellers who do not know an account price should enter `0` in expected payout.
 - First/Original Email explanation is built into the bot.
+- Export stored chats from the bot database with `GET /admin/conversations/export?format=txt&limit=100`.
+- Add `conversationId=<id>` to export one conversation, or `format=json` for raw dashboard data.

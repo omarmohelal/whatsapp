@@ -46,6 +46,12 @@ const adminReplySchema = z
   });
 const handoffStatusQuerySchema = z.nativeEnum(HandoffStatus).optional();
 const faqSuggestionStatusQuerySchema = z.nativeEnum(FaqSuggestionStatus).optional();
+const exportConversationsQuerySchema = z.object({
+  format: z.enum(['txt', 'json']).default('txt'),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  messageLimit: z.coerce.number().int().min(1).max(2000).default(500),
+  conversationId: z.string().uuid().optional()
+});
 const mediaSchema = z.object({
   key: z.string().min(2),
   game: z.string().optional(),
@@ -102,6 +108,55 @@ function routeId(req: { params: Record<string, string | string[] | undefined> },
   }
 
   return value;
+}
+
+function exportedMessageBody(message: { body: string | null; contentType: string; mediaUrl: string | null }) {
+  const body = message.body?.trim();
+  if (body) return body;
+  if (message.mediaUrl) return `[${message.contentType}] ${message.mediaUrl}`;
+  return `[${message.contentType}]`;
+}
+
+function conversationExportText(
+  conversations: Array<{
+    id: string;
+    lastIntent: string | null;
+    detectedGame: string | null;
+    handoffStatus: string;
+    isSensitive: boolean;
+    contact: { waId: string; profileName: string | null; displayName: string | null };
+    messages: Array<{
+      createdAt: Date;
+      direction: string;
+      body: string | null;
+      contentType: string;
+      mediaUrl: string | null;
+      intent: string | null;
+    }>;
+  }>
+) {
+  return conversations
+    .map((conversation) => {
+      const header = [
+        `Conversation: ${conversation.id}`,
+        `Customer: ${conversation.contact.profileName ?? conversation.contact.displayName ?? conversation.contact.waId}`,
+        `Phone: ${conversation.contact.waId}`,
+        `Handoff: ${conversation.handoffStatus}`,
+        `Sensitive: ${conversation.isSensitive ? 'yes' : 'no'}`,
+        `Last intent: ${conversation.lastIntent ?? '-'}`,
+        `Detected game: ${conversation.detectedGame ?? '-'}`
+      ].join('\n');
+
+      const messages = conversation.messages
+        .map((message) => {
+          const intent = message.intent ? ` | intent=${message.intent}` : '';
+          return `[${message.createdAt.toISOString()}] ${message.direction}${intent}: ${exportedMessageBody(message)}`;
+        })
+        .join('\n');
+
+      return `${header}\n\n${messages || '(no messages)'}`;
+    })
+    .join('\n\n---\n\n');
 }
 
 export function createAdminRouter(deps: AdminRouterDeps) {
@@ -288,6 +343,39 @@ export function createAdminRouter(deps: AdminRouterDeps) {
       });
 
       res.json({ data: conversations });
+    })
+  );
+
+  router.get(
+    '/admin/conversations/export',
+    asyncHandler(async (req, res) => {
+      const business = await getDefaultBusiness(deps.prisma);
+      const query = exportConversationsQuerySchema.parse(req.query);
+      const conversations = await deps.prisma.conversation.findMany({
+        where: {
+          businessId: business.id,
+          ...(query.conversationId ? { id: query.conversationId } : {})
+        },
+        orderBy: { lastMessageAt: 'desc' },
+        take: query.conversationId ? 1 : query.limit,
+        include: {
+          contact: true,
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: query.messageLimit
+          }
+        }
+      });
+
+      if (query.format === 'json') {
+        res.json({ data: conversations });
+        return;
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="thenexus-conversations-${stamp}.txt"`);
+      res.send(conversationExportText(conversations));
     })
   );
 
