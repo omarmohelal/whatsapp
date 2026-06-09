@@ -49,6 +49,7 @@ describe('agent idempotency', () => {
       contact: { upsert: jest.fn().mockResolvedValue({ id: 'contact-id' }) },
       conversation: {
         findFirst: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUnique: jest.fn().mockResolvedValue({ firstResponseAt: null }),
         update: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
         findUniqueOrThrow: jest.fn().mockResolvedValue({
           id: 'conversation-id',
@@ -94,6 +95,67 @@ describe('agent idempotency', () => {
 
     expect(mediaCatalog.listActive).not.toHaveBeenCalled();
     expect(whatsapp.sendText).not.toHaveBeenCalled();
+    expect(ai.createChatCompletion).not.toHaveBeenCalled();
+  });
+
+  it('continues auto-replying when handoff is only requested but not active', async () => {
+    const prisma = {
+      business: { upsert: jest.fn().mockResolvedValue({ id: 'business-id', slug: 'thenexus' }) },
+      contact: { upsert: jest.fn().mockResolvedValue({ id: 'contact-id' }) },
+      conversation: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUnique: jest.fn().mockResolvedValue({ firstResponseAt: null }),
+        update: jest.fn().mockResolvedValue({ id: 'conversation-id' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'conversation-id',
+          handoffStatus: 'REQUESTED',
+          aiEnabled: true,
+          lastIntent: null,
+          detectedGame: null,
+          lastAskedQuestion: null,
+          pendingFields: null
+        })
+      },
+      message: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn()
+          .mockResolvedValueOnce({ id: 'inbound-id', createdAt: new Date('2026-06-09T07:41:44.000Z') })
+          .mockResolvedValueOnce({ id: 'outbound-id' })
+      },
+      adminSetting: { findMany: jest.fn().mockResolvedValue([]) }
+    };
+    const whatsapp = {
+      sendText: jest.fn().mockResolvedValue({ messageId: 'wamid.out' }),
+      sendImage: jest.fn()
+    };
+    const mediaCatalog = { listActive: jest.fn().mockResolvedValue([]) };
+    const ai = { createChatCompletion: jest.fn() };
+    const agent = new AgentService({
+      prisma: prisma as never,
+      whatsapp,
+      knowledge: {} as never,
+      mediaCatalog: mediaCatalog as never,
+      ai: ai as never,
+      env,
+      logger
+    });
+
+    await agent.handleIncomingMessage({
+      waId: '905377859633',
+      messageId: 'wamid.requested',
+      text: 'طرق الدفع',
+      type: 'text',
+      raw: {
+        id: 'wamid.requested',
+        from: '905377859633',
+        type: 'text',
+        text: { body: 'طرق الدفع' }
+      }
+    });
+
+    expect(mediaCatalog.listActive).toHaveBeenCalled();
+    expect(whatsapp.sendText).toHaveBeenCalled();
     expect(ai.createChatCompletion).not.toHaveBeenCalled();
   });
 

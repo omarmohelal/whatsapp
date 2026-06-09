@@ -500,7 +500,6 @@ export class AgentService {
   ) {
     return (
       conversation.handoffStatus === 'ACTIVE' ||
-      conversation.handoffStatus === 'REQUESTED' ||
       !conversation.aiEnabled ||
       !settings.aiEnabled
     );
