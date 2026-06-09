@@ -37,7 +37,7 @@ export default function SettingsPage() {
   const [secureFormUrl, setSecureFormUrl] = useState('https://www.thenexus.ink/');
   const [adminNotificationNumber, setAdminNotificationNumber] = useState('');
   const [aiEnabled, setAiEnabled] = useState(true);
-  const [autoReplyEnabled, setAutoReplyEnabled] = useState(true);
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(30);
   const [replyDebounceSeconds, setReplyDebounceSeconds] = useState(4);
   const [maxAutoRepliesPerTenMinutes, setMaxAutoRepliesPerTenMinutes] = useState(8);
@@ -64,7 +64,7 @@ export default function SettingsPage() {
         setSecureFormUrl(settings.secureFormUrl ?? 'https://www.thenexus.ink/');
         setAdminNotificationNumber(settings.adminNotificationNumber ?? '');
         setAiEnabled(settings.aiEnabled ?? true);
-        setAutoReplyEnabled(settings.autoReplyEnabled ?? true);
+        setAutoReplyEnabled(settings.autoReplyEnabled ?? false);
         setCooldownSeconds(settings.cooldownSeconds ?? 30);
         setReplyDebounceSeconds(settings.replyDebounceSeconds ?? 4);
         setMaxAutoRepliesPerTenMinutes(settings.maxAutoRepliesPerTenMinutes ?? 8);

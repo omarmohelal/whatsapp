@@ -191,7 +191,9 @@ Pages included:
 
 Recommended v2 anti-spam settings:
 
-- `autoReplyEnabled=true`
+- `AUTO_REPLY_ENABLED=false` in Railway for manual-only mode
+- Set `AUTO_REPLY_ENABLED=true` only when you intentionally want automatic bot replies
+- `autoReplyEnabled=false` in dashboard unless the team is ready for automation
 - `cooldownSeconds=30`
 - `replyDebounceSeconds=4`
 - `maxAutoRepliesPerTenMinutes=3`

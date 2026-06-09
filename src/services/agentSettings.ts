@@ -40,7 +40,7 @@ function boolValue(value: unknown, fallback: boolean) {
 }
 
 function envKillSwitchAllowsAutoReply() {
-  return env.AUTO_REPLY_ENABLED !== 'false';
+  return env.AUTO_REPLY_ENABLED === 'true';
 }
 
 function stringValue(value: unknown, fallback: string) {

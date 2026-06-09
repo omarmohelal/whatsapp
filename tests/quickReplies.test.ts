@@ -534,6 +534,18 @@ describe('smart deterministic routing before Gemini', () => {
     expect(reply.text).toContain('الأدمن هيراجع');
   });
 
+  it('prioritizes account valuation over game price images', () => {
+    const reply = detectQuickReply('عايز اعرف الاكونت يتباع في رينج كام فالورانت', catalog);
+
+    expect(reply).toMatchObject({
+      matched: true,
+      responseType: 'text',
+      intent: 'account_sell'
+    });
+    expect(reply.text).toBe(ACCOUNT_LISTING_REPLY);
+    expect(reply.imageUrl).toBeUndefined();
+  });
+
   it('prioritizes account form help over old game context', () => {
     const reply = detectQuickReply('بعد اذنك مطلوب في الفورم مش فاهمه ممكن تساعد؟', catalog, {
       detectedGame: 'wild_rift',

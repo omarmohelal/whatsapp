@@ -100,8 +100,27 @@ const accountSellKeywords = [
   'بيع اكونت',
   'بيع اكونتي',
   'اكونتي للبيع',
+  'هبيع اكونت',
+  'هبيع اكونتي',
+  'ابيعو',
+  'ابيعه',
+  'يتباع',
+  'يتباع بكام',
+  'يتسعر',
+  'تسعير اكونت',
+  'تسعر اكونت',
+  'سعر الاكونت',
+  'سعر الأكونت',
+  'رينج كام',
+  'range كام',
+  'يسوى كام',
+  'يسوي كام',
+  'تقييم اكونت',
+  'اقيم اكونت',
   'sell account',
-  'list account'
+  'list account',
+  'account price',
+  'account valuation'
 ];
 const accountBuyKeywords = ['اشتري اكونت', 'عايز اكونت', 'اكونت للبيع', 'buy account', 'account available'];
 const accountFormKeywords = [
@@ -1028,6 +1047,15 @@ export function detectQuickReply(
     });
   }
 
+  if (hasAny(text, accountSellKeywords)) {
+    return textResult({
+      text: ACCOUNT_LISTING_REPLY,
+      intent: 'account_sell',
+      lastAskedQuestion: 'account_form',
+      pendingFields: pendingFields(pending, { flow: 'account_sell', formSent: true })
+    });
+  }
+
   if (
     isThirtyKeyGiveaway(text, memory) ||
     (isThirtyKeyClarificationPending(memory) && hasThirtyKeyGiveawayContext(text, memory) && !hasThirtyKeyPurchaseContext(text, memory))
@@ -1429,15 +1457,6 @@ export function detectQuickReply(
       game: 'league',
       lastAskedQuestion: 'league_gift_details',
       pendingFields: pendingFields(pending, { game: 'league', product: 'skin_or_gift' })
-    });
-  }
-
-  if (hasAny(text, accountSellKeywords)) {
-    return textResult({
-      text: ACCOUNT_LISTING_REPLY,
-      intent: 'account_sell',
-      lastAskedQuestion: 'account_form',
-      pendingFields: pendingFields(pending, { flow: 'account_sell', formSent: true })
     });
   }
 
